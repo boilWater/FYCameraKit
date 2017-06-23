@@ -1,0 +1,11 @@
+use_frameworks!
+
+target 'FYCameraKit_Example' do
+  pod 'FYCameraKit', :path => '../'
+
+  target 'FYCameraKit_Tests' do
+    inherit! :search_paths
+
+    pod 'Kiwi'
+  end
+end
