@@ -38,7 +38,7 @@
 
 /* Begin PBXFileReference section */
 		08DD0A8369CD04D211BCE361 /* Pods-FYCameraKit_Tests.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FYCameraKit_Tests.debug.xcconfig"; path = "Pods/Target Support Files/Pods-FYCameraKit_Tests/Pods-FYCameraKit_Tests.debug.xcconfig"; sourceTree = "<group>"; };
-		1AE5970982AC08FA51704800 /* FYCameraKit.podspec */ = {isa = PBXFileReference; includeInIndex = 1; name = FYCameraKit.podspec; path = ../FYCameraKit.podspec; sourceTree = "<group>"; };
+		1AE5970982AC08FA51704800 /* FYCameraKit.podspec */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = FYCameraKit.podspec; path = ../FYCameraKit.podspec; sourceTree = "<group>"; };
 		1F1CB9D87F241160E73A09D5 /* Pods-FYCameraKit_Example.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FYCameraKit_Example.release.xcconfig"; path = "Pods/Target Support Files/Pods-FYCameraKit_Example/Pods-FYCameraKit_Example.release.xcconfig"; sourceTree = "<group>"; };
 		255D510EB3236080716D86A7 /* Pods-FYCameraKit_Example.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FYCameraKit_Example.debug.xcconfig"; path = "Pods/Target Support Files/Pods-FYCameraKit_Example/Pods-FYCameraKit_Example.debug.xcconfig"; sourceTree = "<group>"; };
 		3F52672D837D9DB6EA3915CE /* Pods_FYCameraKit_Tests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_FYCameraKit_Tests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -64,8 +64,9 @@
 		627222FBE3AD80DE56EA46C9 /* Pods_FYCameraKit_Example.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_FYCameraKit_Example.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		71719F9E1E33DC2100824A3D /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		873B8AEA1B1F5CCA007FD442 /* Main.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = Main.storyboard; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
-		87E1C8AC0B36133A93B84536 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; name = README.md; path = ../README.md; sourceTree = "<group>"; };
-		C863D964403E1BC76C7D7417 /* LICENSE */ = {isa = PBXFileReference; includeInIndex = 1; name = LICENSE; path = ../LICENSE; sourceTree = "<group>"; };
+		87E1C8AC0B36133A93B84536 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
+		AE33B3671EFCF160001351B2 /* FYCameraKit-PrefixHeader.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "FYCameraKit-PrefixHeader.pch"; sourceTree = "<group>"; };
+		C863D964403E1BC76C7D7417 /* LICENSE */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = LICENSE; path = ../LICENSE; sourceTree = "<group>"; };
 		EF87FCBB264DF2AA6448E2F2 /* Pods-FYCameraKit_Tests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FYCameraKit_Tests.release.xcconfig"; path = "Pods/Target Support Files/Pods-FYCameraKit_Tests/Pods-FYCameraKit_Tests.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -151,6 +152,7 @@
 				6003F595195388D20070C39A /* FYCameraKit-Info.plist */,
 				6003F596195388D20070C39A /* InfoPlist.strings */,
 				6003F599195388D20070C39A /* main.m */,
+				AE33B3671EFCF160001351B2 /* FYCameraKit-PrefixHeader.pch */,
 				6003F59B195388D20070C39A /* FYCameraKit-Prefix.pch */,
 			);
 			name = "Supporting Files";
@@ -250,6 +252,9 @@
 				LastUpgradeCheck = 0720;
 				ORGANIZATIONNAME = boilwater;
 				TargetAttributes = {
+					6003F589195388D20070C39A = {
+						DevelopmentTeam = G583SJY324;
+					};
 					6003F5AD195388D20070C39A = {
 						TestTargetID = 6003F589195388D20070C39A;
 					};
@@ -524,6 +529,7 @@
 			baseConfigurationReference = 255D510EB3236080716D86A7 /* Pods-FYCameraKit_Example.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = G583SJY324;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "FYCameraKit/FYCameraKit-Prefix.pch";
 				INFOPLIST_FILE = "FYCameraKit/FYCameraKit-Info.plist";
@@ -539,6 +545,7 @@
 			baseConfigurationReference = 1F1CB9D87F241160E73A09D5 /* Pods-FYCameraKit_Example.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				DEVELOPMENT_TEAM = G583SJY324;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = "FYCameraKit/FYCameraKit-Prefix.pch";
 				INFOPLIST_FILE = "FYCameraKit/FYCameraKit-Info.plist";

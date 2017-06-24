@@ -1,0 +1,6 @@
+framework module Pods_FYCameraKit_Example {
+  umbrella header "Pods-FYCameraKit_Example-umbrella.h"
+
+  export *
+  module * { export * }
+}

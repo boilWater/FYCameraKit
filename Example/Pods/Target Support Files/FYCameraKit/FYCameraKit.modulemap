@@ -1,0 +1,6 @@
+framework module FYCameraKit {
+  umbrella header "FYCameraKit-umbrella.h"
+
+  export *
+  module * { export * }
+}

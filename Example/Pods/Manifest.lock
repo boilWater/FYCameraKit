@@ -1,0 +1,19 @@
+PODS:
+  - FYCameraKit (0.1.0)
+  - Kiwi (2.4.0)
+
+DEPENDENCIES:
+  - FYCameraKit (from `../`)
+  - Kiwi
+
+EXTERNAL SOURCES:
+  FYCameraKit:
+    :path: "../"
+
+SPEC CHECKSUMS:
+  FYCameraKit: 6d3f6efc7329d3f7b3d7d8c758886115bbae3b1c
+  Kiwi: f49c9d54b28917df5928fe44968a39ed198cb8a8
+
+PODFILE CHECKSUM: ec83aeefc2a72eca9f769b7fd13a408e8f0fef93
+
+COCOAPODS: 1.2.1
