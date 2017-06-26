@@ -23,23 +23,24 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
 @property(nonatomic, strong) UIButton *mTakePhotoButton; //take photo
 @property(nonatomic, strong) UIView *mFocusView; //point of camera
 
+@property(nonatomic, strong) AVCaptureDevice *mCaptureDevice; //
 @property(nonatomic, strong) AVCaptureSession *mCaptureSession; //translation between input and output
 @property(nonatomic, strong) AVCaptureDeviceInput *mCaptureDeviceInput; //data to input
 @property(nonatomic, strong) AVCaptureStillImageOutput *mCaptureStillImageOutput; //data to output
 @property(nonatomic, strong) AVCaptureVideoPreviewLayer *mCaptureVideoPreviewLayer; //layer of photo to preview 
-@property(nonatomic, strong) AVCaptureConnection *mCaptureConnection;
+//@property(nonatomic, strong) AVCaptureConnection *mCaptureConnection;
 
 @end
 
 @implementation FYViewController
 
-- (void)viewDidLoad
-{
+- (void)viewDidLoad {
     [super viewDidLoad];
     [self initHierarchy];
     [self initParameters];
     
     [self addTapGestureRecognizer];
+    [self addNotifacationWithCaptureDevice:self.mCaptureDevice];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
@@ -50,6 +51,10 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
     [self.mCaptureSession stopRunning];
+}
+
+- (void)dealloc {
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureDeviceSubjectAreaDidChangeNotification object:self.mCaptureDevice];
 }
 
 - (void)didReceiveMemoryWarning
@@ -84,6 +89,14 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
 - (void)addTapGestureRecognizer {
     UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapGestureScreen:)];
     [self.view addGestureRecognizer:tapGestureRecognizer];
+}
+
+- (void)addNotifacationWithCaptureDevice:(AVCaptureDevice *)captureDevice {
+    [self setCameraConfigurationWithChangedCameraConfiguration:^(AVCaptureDevice *device) {
+        device.subjectAreaChangeMonitoringEnabled = YES;
+    }];
+    NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
+    [notificationCenter addObserver:self selector:@selector(setAutoFocusCenterByChangingCaptureDevice:) name:AVCaptureDeviceSubjectAreaDidChangeNotification object:captureDevice];
 }
 
 - (void)tapGestureScreen:(UITapGestureRecognizer *)gestureRecognizer {
@@ -157,7 +170,25 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
     }
 }
 
+- (void)setAutoFocusCenterByChangingCaptureDevice:(AVCaptureDevice *)device {
+    CGPoint point = self.mVideoPreview.center;
+    CGPoint cameraPoint = [self.mCaptureVideoPreviewLayer captureDevicePointOfInterestForPoint:point];
+    [self setCameraFocusWithPoint:point];
+    [self changeFocusWithMode:AVCaptureFocusModeAutoFocus captureExposureMode:AVCaptureExposureModeAutoExpose atCurrentPoint:cameraPoint];
+}
+
+- (void)areaChangeWithCaptureDevice:(AVCaptureDevice *)device {
+    NSLog(@"device is change :");
+}
+
 #pragma mark - setter & getter (Lazy loading)
+
+- (AVCaptureDevice *)mCaptureDevice {
+    if (!_mCaptureDevice) {
+        _mCaptureDevice = [self getCameraWithCaptureDevicePosition:AVCaptureDevicePositionBack];
+    }
+    return _mCaptureDevice;
+}
 
 - (AVCaptureSession *)mCaptureSession {
     if (!_mCaptureSession) {
@@ -172,8 +203,8 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
 - (AVCaptureDeviceInput *)mCaptureDeviceInput {
     NSError *error = nil;
     if (!_mCaptureDeviceInput) {
-        AVCaptureDevice *backGroundCamera = [self getCameraWithCaptureDevicePosition:AVCaptureDevicePositionBack];
-        _mCaptureDeviceInput = [[AVCaptureDeviceInput alloc] initWithDevice:backGroundCamera error:&error];
+//        AVCaptureDevice *backGroundCamera = [self getCameraWithCaptureDevicePosition:AVCaptureDevicePositionBack];
+        _mCaptureDeviceInput = [[AVCaptureDeviceInput alloc] initWithDevice:self.mCaptureDevice error:&error];
         if (!error) {
             NSLog(@"get camera of backgroud failure in class:%p", self);
         }
@@ -194,7 +225,7 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
     if (!_mCaptureVideoPreviewLayer) {
         _mCaptureVideoPreviewLayer = [AVCaptureVideoPreviewLayer layerWithSession:self.mCaptureSession];
         CALayer *layer = self.mVideoPreview.layer;
-        layer.masksToBounds = YES;
+//        layer.masksToBounds = YES;
         _mCaptureVideoPreviewLayer.frame = layer.bounds;
         _mCaptureVideoPreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
     }
