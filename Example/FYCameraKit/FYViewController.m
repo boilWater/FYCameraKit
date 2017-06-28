@@ -55,12 +55,12 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
 
 - (void)dealloc {
     [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureDeviceSubjectAreaDidChangeNotification object:self.mCaptureDevice];
+    NSLog(@"dealloc : %p", __func__);
 }
 
 - (void)didReceiveMemoryWarning
 {
     [super didReceiveMemoryWarning];
-    // Dispose of any resources that can be recreated.
 }
 
 #pragma mark - initHierarchy(privated Method)
@@ -77,6 +77,8 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
 #pragma mark - initParameters(privated Method)
 
 - (void)initParameters {
+//    考虑是否需要执行 beginConfiguration 来对 CaptureSession 进行刷新
+    [_mCaptureSession beginConfiguration];
     if ([self.mCaptureSession canAddInput:self.mCaptureDeviceInput]) {
         [_mCaptureSession addInput:_mCaptureDeviceInput];
     }
@@ -84,6 +86,7 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
     if ([self.mCaptureSession canAddOutput:self.mCaptureStillImageOutput]) {
         [_mCaptureSession addOutput:_mCaptureStillImageOutput];
     }
+    [_mCaptureSession commitConfiguration];
 }
 
 - (void)addTapGestureRecognizer {
@@ -166,7 +169,9 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
         changeCameraConfiguration(captureDevice);
         [captureDevice unlockForConfiguration];
     }else {
-        
+        NSError *errorLog = [self getErrorWithMessage:[NSString stringWithFormat:@"%@", error] method:NSStringFromSelector(_cmd)];
+        NSLog(@"error: %@", errorLog);
+        return;
     }
 }
 
@@ -177,8 +182,18 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
     [self changeFocusWithMode:AVCaptureFocusModeAutoFocus captureExposureMode:AVCaptureExposureModeAutoExpose atCurrentPoint:cameraPoint];
 }
 
-- (void)areaChangeWithCaptureDevice:(AVCaptureDevice *)device {
-    NSLog(@"device is change :");
+- (NSError *)getErrorWithMessage:(NSString *)message method:(NSString *)method {
+    NSErrorDomain errorDomain = [NSString stringWithFormat:@"error : %@", message];
+    NSInteger errorCode = 101;
+    NSDictionary *errorDic = nil;
+    NSError *error = [NSError errorWithDomain:errorDomain code:errorCode userInfo:errorDic];
+    return error;
+}
+
+#pragma mark - override (System Settings)
+
+- (BOOL)prefersStatusBarHidden {
+    return YES;
 }
 
 #pragma mark - setter & getter (Lazy loading)
@@ -186,6 +201,7 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
 - (AVCaptureDevice *)mCaptureDevice {
     if (!_mCaptureDevice) {
         _mCaptureDevice = [self getCameraWithCaptureDevicePosition:AVCaptureDevicePositionBack];
+//        NSString *localizedName = _mCaptureDevice.localizedName;
     }
     return _mCaptureDevice;
 }
@@ -195,6 +211,9 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
         _mCaptureSession = [[AVCaptureSession alloc] init];
         if ([_mCaptureSession canSetSessionPreset:AVCaptureSessionPreset640x480]) {
             _mCaptureSession.sessionPreset = AVCaptureSessionPreset640x480;
+//            接口测试
+            BOOL isInterrupted = _mCaptureSession.interrupted;
+            
         }
     }
     return _mCaptureSession;

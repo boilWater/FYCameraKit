@@ -32,7 +32,7 @@
 	<string></string>
 	<key>NSAppleMusicUsageDescription</key>
 	<string></string>
-	<key>NSPhotoLibraryUsageDescription</key>
+	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string></string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
