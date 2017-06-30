@@ -8,27 +8,42 @@
 
 #import "FYViewController.h"
 #import "FYCameraKit-PrefixHeader.pch"
-#import <AVFoundation/AVCaptureDevice.h>
-#import <AVFoundation/AVCaptureInput.h>
-#import <AVFoundation/AVCaptureOutput.h>
-#import <AVFoundation/AVCaptureSession.h>
-#import <AVFoundation/AVCaptureVideoPreviewLayer.h>
+#import "FYPreviewView.h"
+#import <AVFoundation/AVFoundation.h>
 
-typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
+typedef NS_ENUM(NSInteger, FYCameraLivePhotoMode) {
+    FYCameraLivePhotoModeOn = 0,
+    FYCameraLivePhotoModeOff = 1
+};
+
+typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
+    FYCameraCaptureModePhoto = 0,
+    FYCameraCaptureModeMovie = 1
+};
+
+
 
 @interface FYViewController ()
 
-@property(nonatomic, strong) UIView *mVideoPreview; //image to preview
-@property(nonatomic, strong) UIView *mStickerView; //view of taking photo
-@property(nonatomic, strong) UIButton *mTakePhotoButton; //take photo
-@property(nonatomic, strong) UIView *mFocusView; //point of camera
+//session
+@property(nonatomic) FYPreviewView *previewView;
+@property(nonatomic, strong) UISegmentedControl *captureModeControl;
+@property(nonatomic, assign) FYCameraCaptureMode captureMode;
 
-@property(nonatomic, strong) AVCaptureDevice *mCaptureDevice; //
-@property(nonatomic, strong) AVCaptureSession *mCaptureSession; //translation between input and output
-@property(nonatomic, strong) AVCaptureDeviceInput *mCaptureDeviceInput; //data to input
-@property(nonatomic, strong) AVCaptureStillImageOutput *mCaptureStillImageOutput; //data to output
-@property(nonatomic, strong) AVCaptureVideoPreviewLayer *mCaptureVideoPreviewLayer; //layer of photo to preview 
-//@property(nonatomic, strong) AVCaptureConnection *mCaptureConnection;
+//device
+@property(nonatomic, strong) UIButton *cameraButton;
+@property(nonatomic, strong) UILabel *cameraUnavailableLabel;
+
+//capturing photos
+@property(nonatomic, strong) UIButton *photoButton; //take photo
+@property(nonatomic, strong) UIButton *livePhotoModeButton;
+@property(nonatomic, strong) UIView *focusView; //point of camera
+@property(nonatomic, strong) UILabel *capturingLivePhotoLabel;
+@property(nonatomic) FYCameraLivePhotoMode livePhotoMode;
+
+//recoding movies
+@property(nonatomic, strong) UIButton *recordButton;
+@property(nonatomic, strong) UIButton *resumeButton;
 
 @end
 
@@ -38,23 +53,18 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
     [super viewDidLoad];
     [self initHierarchy];
     [self initParameters];
-    
-    [self addTapGestureRecognizer];
-    [self addNotifacationWithCaptureDevice:self.mCaptureDevice];
 }
 
 - (void)viewWillAppear:(BOOL)animated {
     [super viewWillAppear:animated];
-    [self.mCaptureSession startRunning];
+    
 }
 
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
-    [self.mCaptureSession stopRunning];
 }
 
 - (void)dealloc {
-    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureDeviceSubjectAreaDidChangeNotification object:self.mCaptureDevice];
     NSLog(@"dealloc : %p", __func__);
 }
 
@@ -63,243 +73,227 @@ typedef void(^FYChangeCamreaConfiguration)(AVCaptureDevice *device);
     [super didReceiveMemoryWarning];
 }
 
-#pragma mark - initHierarchy(privated Method)
+#pragma mark - privated Method
+#pragma mark -initHierarchy
 
 - (void)initHierarchy {
-    self.view.backgroundColor = [UIColor purpleColor];
-    [self.view addSubview:self.mVideoPreview];
-    [self.mVideoPreview.layer insertSublayer:self.mCaptureVideoPreviewLayer atIndex:0];
-    [self.mVideoPreview addSubview:self.mFocusView];
-    [self.view addSubview:self.mStickerView];
-    [self.view addSubview:self.mTakePhotoButton];
+    self.view.backgroundColor = [UIColor yellowColor];
+    [self.view addSubview:self.previewView];
+    [self.view addSubview:self.livePhotoModeButton];
+    [self.view addSubview:self.capturingLivePhotoLabel];
+    [self.view addSubview:self.captureModeControl];
+    [self.view addSubview:self.recordButton];
+    [self.view addSubview:self.photoButton];
+    [self.view addSubview:self.cameraButton];
 }
 
-#pragma mark - initParameters(privated Method)
+#pragma mark -initParameters
 
 - (void)initParameters {
-//    考虑是否需要执行 beginConfiguration 来对 CaptureSession 进行刷新
-    [_mCaptureSession beginConfiguration];
-    if ([self.mCaptureSession canAddInput:self.mCaptureDeviceInput]) {
-        [_mCaptureSession addInput:_mCaptureDeviceInput];
-    }
-
-    if ([self.mCaptureSession canAddOutput:self.mCaptureStillImageOutput]) {
-        [_mCaptureSession addOutput:_mCaptureStillImageOutput];
-    }
-    [_mCaptureSession commitConfiguration];
+    self.captureMode = FYCameraCaptureModePhoto;
 }
 
-- (void)addTapGestureRecognizer {
-    UITapGestureRecognizer *tapGestureRecognizer = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapGestureScreen:)];
-    [self.view addGestureRecognizer:tapGestureRecognizer];
-}
-
-- (void)addNotifacationWithCaptureDevice:(AVCaptureDevice *)captureDevice {
-    [self setCameraConfigurationWithChangedCameraConfiguration:^(AVCaptureDevice *device) {
-        device.subjectAreaChangeMonitoringEnabled = YES;
-    }];
-    NSNotificationCenter *notificationCenter = [NSNotificationCenter defaultCenter];
-    [notificationCenter addObserver:self selector:@selector(setAutoFocusCenterByChangingCaptureDevice:) name:AVCaptureDeviceSubjectAreaDidChangeNotification object:captureDevice];
-}
-
-- (void)tapGestureScreen:(UITapGestureRecognizer *)gestureRecognizer {
-    CGPoint point = [gestureRecognizer locationInView:self.mVideoPreview];
-    CGPoint cameraPoint = [self.mCaptureVideoPreviewLayer captureDevicePointOfInterestForPoint:point];
-    [self setCameraFocusWithPoint:point];
-    [self changeFocusWithMode:AVCaptureFocusModeAutoFocus captureExposureMode: AVCaptureExposureModeAutoExpose atCurrentPoint:cameraPoint];
-}
-
-#pragma mark - privatedMethods(privated Method)
-
-- (AVCaptureDevice *)getCameraWithCaptureDevicePosition:(AVCaptureDevicePosition)position {
-    NSArray *cameras = [AVCaptureDevice devicesWithMediaType:AVMediaTypeVideo];
-    for (AVCaptureDevice *camera in cameras) {
-        if (position == [camera position]) {
-            return camera;
-        }
-    }
-    return nil;
-}
-
-- (void)clickTakePhotoButton:(UIButton *)sender {
-    AVCaptureConnection *captureConnection = [self.mCaptureStillImageOutput connectionWithMediaType:AVMediaTypeVideo];
-    [self.mCaptureStillImageOutput captureStillImageAsynchronouslyFromConnection:captureConnection completionHandler:^(CMSampleBufferRef  _Nullable imageDataSampleBuffer, NSError * _Nullable error) {
-        NSData *data = [AVCaptureStillImageOutput jpegStillImageNSDataRepresentation:imageDataSampleBuffer];
-        UIImage *takePhotoImage = [UIImage imageWithData:data];
-        UIImageWriteToSavedPhotosAlbum(takePhotoImage, nil, nil, nil);
-    }];
-}
-
-- (void)setCameraFocusWithPoint:(CGPoint)point {
-    self.mFocusView.center = point;
-    self.mFocusView.transform = CGAffineTransformMakeScale(1.5, 1.5);
-    self.mFocusView.alpha = 1.0f;
-    NSTimeInterval timeInterval = 1.0f;
-    [UIView animateWithDuration:timeInterval animations:^{
-        self.mFocusView.transform = CGAffineTransformIdentity;
-    } completion:^(BOOL finished) {
-        self.mFocusView.alpha = 0.0f;
-    }];
-}
-
-- (void)changeFocusWithMode:(AVCaptureFocusMode)focusMode
-        captureExposureMode:(AVCaptureExposureMode)exposureMode
-             atCurrentPoint:(CGPoint)point {
-    [self setCameraConfigurationWithChangedCameraConfiguration:^(AVCaptureDevice *device) {
-        if ([device isFocusModeSupported:focusMode]) {
-            [device setFocusMode:focusMode];
-        }
-        if ([device isFocusPointOfInterestSupported]) {
-            [device setFocusPointOfInterest:point];
-        }
-        
-        if ([device isExposureModeSupported:exposureMode]) {
-            [device setExposureMode:exposureMode];
-        }
-        if ([device isExposurePointOfInterestSupported]) {
-            [device setExposurePointOfInterest:point];
-        }
-    }];
-}
-
-- (void)setCameraConfigurationWithChangedCameraConfiguration:(FYChangeCamreaConfiguration)changeCameraConfiguration {
-    AVCaptureDevice *captureDevice = [self.mCaptureDeviceInput device];
-    NSError *error = nil;
-    if ([captureDevice lockForConfiguration:&error]) {
-        changeCameraConfiguration(captureDevice);
-        [captureDevice unlockForConfiguration];
-    }else {
-        NSError *errorLog = [self getErrorWithMessage:[NSString stringWithFormat:@"%@", error] method:NSStringFromSelector(_cmd)];
-        NSLog(@"error: %@", errorLog);
-        return;
-    }
-}
-
-- (void)setAutoFocusCenterByChangingCaptureDevice:(AVCaptureDevice *)device {
-    CGPoint point = self.mVideoPreview.center;
-    CGPoint cameraPoint = [self.mCaptureVideoPreviewLayer captureDevicePointOfInterestForPoint:point];
-    [self setCameraFocusWithPoint:point];
-    [self changeFocusWithMode:AVCaptureFocusModeAutoFocus captureExposureMode:AVCaptureExposureModeAutoExpose atCurrentPoint:cameraPoint];
-}
-
-- (NSError *)getErrorWithMessage:(NSString *)message method:(NSString *)method {
-    NSErrorDomain errorDomain = [NSString stringWithFormat:@"error : %@", message];
-    NSInteger errorCode = 101;
-    NSDictionary *errorDic = nil;
-    NSError *error = [NSError errorWithDomain:errorDomain code:errorCode userInfo:errorDic];
-    return error;
-}
-
-#pragma mark - override (System Settings)
+#pragma mark - system Setting
+#pragma mark -overrided
 
 - (BOOL)prefersStatusBarHidden {
     return YES;
 }
 
-#pragma mark - setter & getter (Lazy loading)
+//- (void)setNeedsLayout{
+//    
+//}
 
-- (AVCaptureDevice *)mCaptureDevice {
-    if (!_mCaptureDevice) {
-        _mCaptureDevice = [self getCameraWithCaptureDevicePosition:AVCaptureDevicePositionBack];
-//        NSString *localizedName = _mCaptureDevice.localizedName;
+#pragma mark - lazy loaded
+#pragma mark -composeControls
+
+- (UIButton *)livePhotoModeButton {
+    if (!_livePhotoModeButton) {
+        CGFloat heightLivePhotoModeButton = 30;
+        CGFloat widthLivePhotoModeButton = 175;
+        CGFloat positionY = 20;
+        CGFloat positionX = (SCREEN_WIDTH - widthLivePhotoModeButton)/2;
+        CGRect rect = CGRectMake(positionX, positionY, widthLivePhotoModeButton, heightLivePhotoModeButton);
+        _livePhotoModeButton = [self configureButtonWithRect:rect title:@"live photo on" selector:@selector(livePhotoClickEventWithButton:) ];
+        [_livePhotoModeButton setTitleColor:[UIColor yellowColor] forState:UIControlStateNormal];
     }
-    return _mCaptureDevice;
+    return _livePhotoModeButton;
 }
 
-- (AVCaptureSession *)mCaptureSession {
-    if (!_mCaptureSession) {
-        _mCaptureSession = [[AVCaptureSession alloc] init];
-        if ([_mCaptureSession canSetSessionPreset:AVCaptureSessionPreset640x480]) {
-            _mCaptureSession.sessionPreset = AVCaptureSessionPreset640x480;
-//            接口测试
-            BOOL isInterrupted = _mCaptureSession.interrupted;
+- (UILabel *)capturingLivePhotoLabel {
+    if (!_capturingLivePhotoLabel) {
+        CGFloat widthCaptureingLivePhotoLabel = 70.f;
+        CGFloat heightCaptureingLivePhotoLabel = 25.f;
+        CGFloat positionX = (SCREEN_WIDTH - widthCaptureingLivePhotoLabel)/2;
+        CGFloat positionY = _previewView.frame.origin.y + 2;
+        _capturingLivePhotoLabel = [[UILabel alloc] initWithFrame:CGRectMake(positionX, positionY, widthCaptureingLivePhotoLabel, heightCaptureingLivePhotoLabel)];
+        _capturingLivePhotoLabel.text = @"Live";
+        _capturingLivePhotoLabel.backgroundColor = [UIColor yellowColor];
+//        _capturingLivePhotoLabel.hidden = YES;
+        _capturingLivePhotoLabel.textAlignment = NSTextAlignmentCenter;
+        _capturingLivePhotoLabel.layer.cornerRadius = 3.0f;
+        _capturingLivePhotoLabel.clipsToBounds = YES;
+        _capturingLivePhotoLabel.enabled = NO;
+    }
+    return _capturingLivePhotoLabel;
+}
+
+- (FYPreviewView *)previewView {
+    if (!_previewView) {
+        CGFloat positionY = 72;
+        CGFloat heightPreviewView = SCREEN_HEIGHT - positionY - 90;
+        _previewView = [[FYPreviewView alloc] initWithFrame:CGRectMake(MARGIN_ALL_BORDER, positionY, SCREEN_WIDTH - MARGIN_ALL_BORDER * 2, heightPreviewView)];
+        _previewView.backgroundColor = [UIColor lightGrayColor];
+    }
+    return _previewView;
+}
+
+- (UISegmentedControl *)captureModeControl {
+    if (!_captureModeControl) {
+        CGFloat heightCaptureModeControl = 30.f;
+        CGFloat widthCaptureModeControl = 85.f;
+        CGFloat positionY = _previewView.frame.origin.y + _previewView.bounds.size.height - heightCaptureModeControl - MARGIN_ALL_BORDER;
+        CGFloat positionX = (SCREEN_WIDTH - widthCaptureModeControl)/2;
+        NSArray *titleCaptureModeControlItems = @[@"photo",@"movie"];
+        _captureModeControl = [[UISegmentedControl alloc] initWithItems:titleCaptureModeControlItems];
+        _captureModeControl.frame = CGRectMake(positionX, positionY, widthCaptureModeControl, heightCaptureModeControl);
+        _captureModeControl.selectedSegmentIndex = 0;
+        _captureModeControl.tintColor = [UIColor yellowColor];
+        [_captureModeControl addTarget:self action:@selector(segmentedClickInvocationWithSegmentedControl:) forControlEvents:UIControlEventValueChanged];
+    }
+    return _captureModeControl;
+}
+
+- (UIButton *)recordButton {
+    if (!_recordButton) {
+        CGFloat heightRecordButton = 40;
+        CGFloat widthRecordButton = (SCREEN_WIDTH - 30 * 4)/3;
+        CGFloat positionX = 40;
+        CGFloat positionY = _previewView.frame.origin.y + _previewView.bounds.size.height + 25;
+        CGRect rect = CGRectMake(positionX, positionY, widthRecordButton, heightRecordButton);
+        _recordButton = [self configureButtonWithRect:rect title:@"Record" selector:@selector(recordClickEventWithButton:)];
+    }
+    return _recordButton;
+}
+
+- (UIButton *)photoButton {
+    if (!_photoButton) {
+        CGFloat heightRecordButton = 40;
+        CGFloat widthRecordButton = (SCREEN_WIDTH - 30 * 4)/3;
+        CGFloat positionX = _recordButton.frame.origin.x + widthRecordButton + 30;
+        CGFloat positionY = _previewView.frame.origin.y + _previewView.bounds.size.height + 25;
+        CGRect rect = CGRectMake(positionX, positionY, widthRecordButton, heightRecordButton);
+        _photoButton = [self configureButtonWithRect:rect title:@"Photo" selector:@selector(photoClickEventWithButton:)];
+    }
+    return _photoButton;
+}
+
+- (UIButton *)cameraButton {
+    if (!_cameraButton) {
+        CGFloat heightRecordButton = 40;
+        CGFloat widthRecordButton = (SCREEN_WIDTH - 30 * 4)/3;
+        CGFloat positionX = SCREEN_WIDTH - widthRecordButton - 30;
+        CGFloat positionY = _previewView.frame.origin.y + _previewView.bounds.size.height + 25;
+        CGRect rect = CGRectMake(positionX, positionY, widthRecordButton, heightRecordButton);
+        _cameraButton = [self configureButtonWithRect:rect title:@"Cramera" selector:@selector(cameraClickEventWithButton:)];
+    }
+    return _cameraButton;
+}
+
+- (UIButton *)configureButtonWithRect:(CGRect)rect title:(NSString *)title selector:(SEL)selector{
+    UIButton *button = [[UIButton alloc] initWithFrame:rect];
+    [button setTitle:title forState:UIControlStateNormal];
+    button.layer.cornerRadius = 6.0f;
+    button.clipsToBounds = YES;
+    button.backgroundColor = [UIColor grayColor];
+    [button addTarget:self action:selector forControlEvents:UIControlEventTouchDown];
+    return button;
+}
+
+#pragma mark - ClickEventInvocation
+
+- (void)livePhotoClickEventWithButton:(UIButton *)livePhotoButton {
+    if ([livePhotoButton.titleLabel.text isEqualToString:@"live photo on"]) {
+        [livePhotoButton setTitle:@"live photo off" forState:UIControlStateNormal];
+        livePhotoButton.alpha = 0.8;
+        livePhotoButton.backgroundColor = [UIColor lightGrayColor];
+        _capturingLivePhotoLabel.hidden = YES;
+    }else {
+        _capturingLivePhotoLabel.hidden = NO;
+        [livePhotoButton setTitle:@"live photo on" forState:UIControlStateNormal];
+        livePhotoButton.backgroundColor = [UIColor grayColor];
+    }
+}
+
+- (void)segmentedClickInvocationWithSegmentedControl:(UISegmentedControl *)segmentedControl {
+    switch (segmentedControl.selectedSegmentIndex) {
+        case 0:
+        {
+            self.captureMode = FYCameraCaptureModePhoto;
+            [self changeSegmentControlNeedsLayout];
+            break;
+        }
+        case 1:
+        {
+            self.captureMode = FYCameraCaptureModeMovie;
+            [self changeSegmentControlNeedsLayout];
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+- (void)recordClickEventWithButton:(UIButton *)recordButton {
+    if (0 == _captureModeControl.selectedSegmentIndex) {
+        return;
+    }
+    if ([recordButton.titleLabel.text isEqualToString:@"Record"] && _captureModeControl.selectedSegmentIndex == 1) {
+        [recordButton setTitle:@"Stop" forState:UIControlStateNormal];
+        [recordButton setBackgroundColor:[UIColor redColor]];
+    }else{
+        [recordButton setTitle:@"Record" forState:UIControlStateNormal];
+        [recordButton setBackgroundColor:[UIColor grayColor]];
+    }
+}
+
+- (void)photoClickEventWithButton:(UIButton *)photoButton {
+    
+}
+
+- (void)cameraClickEventWithButton:(UIButton *)cameraButton {
+    
+}
+
+#pragma mark - privated Method (ClickEventInvocation)
+
+- (void)changeSegmentControlNeedsLayout {
+    if (FYCameraCaptureModePhoto == self.captureMode) {
+        _livePhotoModeButton.hidden = NO;
+        if (FYCameraLivePhotoModeOn == self.livePhotoMode) {
+            _capturingLivePhotoLabel.hidden = NO;
             
+        }else if (FYCameraLivePhotoModeOff == self.livePhotoMode) {
+            _capturingLivePhotoLabel.hidden = YES;
         }
+    }else if (FYCameraCaptureModeMovie == self.captureMode) {
+        _livePhotoModeButton.hidden = YES;
+        _capturingLivePhotoLabel.hidden = YES;
     }
-    return _mCaptureSession;
-}
-
-- (AVCaptureDeviceInput *)mCaptureDeviceInput {
-    NSError *error = nil;
-    if (!_mCaptureDeviceInput) {
-//        AVCaptureDevice *backGroundCamera = [self getCameraWithCaptureDevicePosition:AVCaptureDevicePositionBack];
-        _mCaptureDeviceInput = [[AVCaptureDeviceInput alloc] initWithDevice:self.mCaptureDevice error:&error];
-        if (!error) {
-            NSLog(@"get camera of backgroud failure in class:%p", self);
+    if (FYCameraCaptureModePhoto == self.captureMode) {
+        if ([_recordButton.titleLabel.text isEqualToString:@"Stop"]) {
+            [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
+            [_recordButton setBackgroundColor:[UIColor grayColor]];
         }
+        CGFloat positionY = 72;
+        CGFloat heightPreviewView = SCREEN_HEIGHT - positionY - 90;
+        _previewView.frame = CGRectMake(MARGIN_ALL_BORDER, positionY, SCREEN_WIDTH - MARGIN_ALL_BORDER * 2, heightPreviewView);
+        [self.previewView setNeedsLayout];
+    }else if (FYCameraCaptureModeMovie == self.captureMode){
+        CGRect rect = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+        _previewView.frame = rect;
+        [self.previewView setNeedsLayout];
     }
-    return _mCaptureDeviceInput;
-}
-
-- (AVCaptureStillImageOutput *)mCaptureStillImageOutput {
-    if (!_mCaptureStillImageOutput) {
-        _mCaptureStillImageOutput = [[AVCaptureStillImageOutput alloc] init];
-        NSDictionary *mStillImageOutputSetting = @{AVVideoCodecKey:AVVideoCodecJPEG};
-        [_mCaptureStillImageOutput setOutputSettings:mStillImageOutputSetting];
-    }
-    return _mCaptureStillImageOutput;
-}
-
-- (AVCaptureVideoPreviewLayer *)mCaptureVideoPreviewLayer {
-    if (!_mCaptureVideoPreviewLayer) {
-        _mCaptureVideoPreviewLayer = [AVCaptureVideoPreviewLayer layerWithSession:self.mCaptureSession];
-        CALayer *layer = self.mVideoPreview.layer;
-//        layer.masksToBounds = YES;
-        _mCaptureVideoPreviewLayer.frame = layer.bounds;
-        _mCaptureVideoPreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
-    }
-    return _mCaptureVideoPreviewLayer;
-}
-
-- (UIView *)mVideoPreview {
-    if (!_mVideoPreview) {
-        CGFloat positionY = [UIApplication sharedApplication].statusBarFrame.size.height;
-        _mVideoPreview = [[UIView alloc] initWithFrame:CGRectMake(MARGIN_ALL_BORDER, positionY + MARGIN_ALL_BORDER, SCREEN_WIDTH - MARGIN_ALL_BORDER*2, SCREEN_HEIGHT - positionY - 140 - MARGIN_ALL_BORDER)];
-        _mVideoPreview.backgroundColor = [UIColor orangeColor];
-    }
-    return _mVideoPreview;
-}
-
-- (UIView *)mFocusView {
-    if (!_mFocusView) {
-        CGFloat positionX = _mVideoPreview.frame.size.width/2;
-        CGFloat positionY = _mVideoPreview.frame.origin.y + _mVideoPreview.bounds.size.height/2;
-        CGFloat widthFocusView = 40;
-        CGFloat heidthFocusView = 40;
-        _mFocusView = [[UIView alloc] initWithFrame:CGRectMake(positionX, positionY, widthFocusView, heidthFocusView)];
-        _mFocusView.backgroundColor = [UIColor clearColor];
-        CALayer *calyer = [[CALayer alloc] init];
-        calyer.frame = _mFocusView.bounds;
-        calyer.borderColor = [UIColor yellowColor].CGColor;
-        calyer.borderWidth = 0.7f;
-        calyer.backgroundColor = [UIColor clearColor].CGColor;
-        [_mFocusView.layer insertSublayer:calyer atIndex:0];
-        _mFocusView.alpha = 0.0f;
-    }
-    return _mFocusView;
-}
-
-- (UIView *)mStickerView {
-    if (!_mStickerView) {
-        CGFloat positionY = _mVideoPreview.frame.origin.y + _mVideoPreview.bounds.size.height + MARGIN_ALL_BORDER;
-        _mStickerView = [[UIView alloc] initWithFrame:CGRectMake(MARGIN_ALL_BORDER, positionY, SCREEN_WIDTH - MARGIN_ALL_BORDER*2, SCREEN_HEIGHT - positionY - MARGIN_ALL_BORDER*2)];
-        _mStickerView.backgroundColor = [UIColor yellowColor];
-    }
-    return _mStickerView;
-}
-
-- (UIButton *)mTakePhotoButton {
-    if (!_mTakePhotoButton) {
-        CGFloat heightBt = 40;
-        CGFloat widthBt = 120;
-        CGFloat positionY = _mStickerView.frame.origin.y + _mStickerView.bounds.size.height/2 - heightBt/2 + 15;
-        CGFloat positionX = (SCREEN_WIDTH - widthBt)/2;
-        _mTakePhotoButton = [[UIButton alloc] initWithFrame:CGRectMake(positionX, positionY, widthBt, heightBt)];
-        [_mTakePhotoButton setTitle:@"拍照" forState:UIControlStateNormal];
-        [_mTakePhotoButton setBackgroundColor:[UIColor blueColor]];
-        [_mTakePhotoButton addTarget:self action:@selector(clickTakePhotoButton:) forControlEvents:UIControlEventTouchDown];
-    }
-    return _mTakePhotoButton;
 }
 
 @end

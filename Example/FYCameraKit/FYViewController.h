@@ -12,8 +12,4 @@
 
 @interface FYViewController : UIViewController
 
-@property(nonatomic, strong) AVCaptureSessionPreset kSessionPreset;
-@property(nonatomic, assign) AVCaptureDevicePosition kDevicePosition;
-
-
 @end

@@ -34,6 +34,8 @@
 	<string></string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string></string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string></string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
 		<string>armv7</string>
