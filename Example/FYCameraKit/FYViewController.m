@@ -312,32 +312,33 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 #pragma mark - ClickEventInvocation
 
 - (void)livePhotoClickEventWithButton:(UIButton *)livePhotoButton {
-    
-    NSLog(@"aaa->");
-    if ([livePhotoButton.titleLabel.text isEqualToString:@"live photo on"]) {
-        [livePhotoButton setTitle:@"live photo off" forState:UIControlStateNormal];
-        livePhotoButton.alpha = 0.8;
-        livePhotoButton.backgroundColor = [UIColor lightGrayColor];
-        _capturingLivePhotoLabel.hidden = YES;
-    }else {
-        _capturingLivePhotoLabel.hidden = NO;
-        [livePhotoButton setTitle:@"live photo on" forState:UIControlStateNormal];
-        livePhotoButton.backgroundColor = [UIColor grayColor];
-    }
+    dispatch_async(self.sessionQueue, ^{
+        self.livePhotoMode = (FYCameraLivePhotoModeOn == self.livePhotoMode) ? FYCameraLivePhotoModeOff : FYCameraLivePhotoModeOn;
+        FYCameraLivePhotoMode livePhotoMode = self.livePhotoMode;
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (FYCameraLivePhotoModeOn == livePhotoMode) {
+                [livePhotoButton setTitle:NSLocalizedString(@"live photo off", nil) forState:UIControlStateNormal];
+                livePhotoButton.alpha = 0.8;
+                livePhotoButton.backgroundColor = [UIColor lightGrayColor];
+            }else {
+                [livePhotoButton setTitle:NSLocalizedString(@"live photo on", nil) forState:UIControlStateNormal];
+                livePhotoButton.backgroundColor = [UIColor grayColor];
+            }
+        });
+    });
 }
 
 - (void)segmentedClickInvocationWithSegmentedControl:(UISegmentedControl *)segmentedControl {
     switch (segmentedControl.selectedSegmentIndex) {
         case 0:
         {
-            self.captureMode = FYCameraCaptureModePhoto;
-            [self changeSegmentControlNeedsLayout];
+            [self changeSegmentControlNeedsLayoutAndEventInvocation];
             break;
         }
         case 1:
         {
-            self.captureMode = FYCameraCaptureModeMovie;
-            [self changeSegmentControlNeedsLayout];
+            [self changeSegmentControlNeedsLayoutAndEventInvocation];
             break;
         }
         default:
@@ -359,7 +360,27 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 }
 
 - (void)photoClickEventWithButton:(UIButton *)photoButton {
+    AVCaptureVideoOrientation videoPreviewLayerVideoOrientation = self.previewView.videoPreviewLayer.connection.videoOrientation;
     
+    dispatch_async(self.sessionQueue, ^{
+        AVCaptureConnection *photoOutputConnection = [self.photoOutput connectionWithMediaType:AVMediaTypeVideo];
+        photoOutputConnection.videoOrientation = videoPreviewLayerVideoOrientation;
+        
+        AVCapturePhotoSettings *photoSetting = [AVCapturePhotoSettings photoSettings];
+        photoSetting.flashMode = AVCaptureFlashModeAuto;
+        photoSetting.highResolutionPhotoEnabled = YES;
+        if (photoSetting.availablePreviewPhotoPixelFormatTypes.count > 0) {
+            photoSetting.previewPhotoFormat = @{(NSString *)kCVPixelBufferPixelFormatTypeKey : photoSetting.availablePreviewPhotoPixelFormatTypes.firstObject};
+        }
+        if (self.livePhotoMode == FYCameraLivePhotoModeOn && self.photoOutput.livePhotoCaptureSupported) {
+            NSString *livePhotoMoviceFileName = [NSUUID UUID].UUIDString;
+            NSString *livePhotoMoviceFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[livePhotoMoviceFileName stringByAppendingPathExtension:@"mov"]];
+            photoSetting.livePhotoMovieFileURL = [NSURL URLWithString:livePhotoMoviceFilePath];
+        }
+        
+        //add FYCameraKitPhotoCaptureDelegate
+        
+    });
 }
 
 - (void)cameraClickEventWithButton:(UIButton *)cameraButton {
@@ -478,32 +499,78 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 
 #pragma mark - privated Method (ClickEventInvocation)
 
-- (void)changeSegmentControlNeedsLayout {
+- (void)changeSegmentControlNeedsLayoutAndEventInvocation {
+    dispatch_async(self.sessionQueue, ^{
+        self.captureMode = (FYCameraCaptureModePhoto == self.captureMode) ? FYCameraCaptureModeMovie : FYCameraCaptureModePhoto;
+        FYCameraCaptureMode captureMode = self.captureMode;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (FYCameraCaptureModePhoto == captureMode) {
+                _livePhotoModeButton.hidden = NO;
+                if (FYCameraLivePhotoModeOn == self.livePhotoMode) {
+                    _capturingLivePhotoLabel.hidden = NO;
+                    
+                }else if (FYCameraLivePhotoModeOff == self.livePhotoMode) {
+                    _capturingLivePhotoLabel.hidden = YES;
+                }
+                if ([_recordButton.titleLabel.text isEqualToString:@"Stop"]) {
+                    [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
+                    [_recordButton setBackgroundColor:[UIColor grayColor]];
+                }
+                CGFloat positionY = 72;
+                CGFloat heightPreviewView = SCREEN_HEIGHT - positionY - 90;
+                _previewView.frame = CGRectMake(MARGIN_ALL_BORDER, positionY, SCREEN_WIDTH - MARGIN_ALL_BORDER * 2, heightPreviewView);
+                [self.previewView setNeedsLayout];
+            }else if (FYCameraCaptureModeMovie == captureMode) {
+                _livePhotoModeButton.hidden = YES;
+                _capturingLivePhotoLabel.hidden = YES;
+                CGRect rect = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+                _previewView.frame = rect;
+                [self.previewView setNeedsLayout];
+            }
+        });
+    });
+    [self changeCaptureOutput];
+}
+
+- (void)changeCaptureOutput {
     if (FYCameraCaptureModePhoto == self.captureMode) {
-        _livePhotoModeButton.hidden = NO;
-        if (FYCameraLivePhotoModeOn == self.livePhotoMode) {
-            _capturingLivePhotoLabel.hidden = NO;
+        self.recordButton.enabled = NO;
+        
+        dispatch_async(self.sessionQueue, ^{
+            [self.session beginConfiguration];
+            [self.session removeOutput:self.moviceFileOutput];
+            self.session.sessionPreset = AVCaptureSessionPresetPhoto;
+            [self.session commitConfiguration];
             
-        }else if (FYCameraLivePhotoModeOff == self.livePhotoMode) {
-            _capturingLivePhotoLabel.hidden = YES;
-        }
+            self.moviceFileOutput = nil;
+            
+            if (self.photoOutput.livePhotoCaptureSupported) {
+                self.photoOutput.livePhotoCaptureEnabled = YES;
+                
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    self.photoButton.enabled = YES;
+                });
+            }
+        });
+        
     }else if (FYCameraCaptureModeMovie == self.captureMode) {
-        _livePhotoModeButton.hidden = YES;
-        _capturingLivePhotoLabel.hidden = YES;
-    }
-    if (FYCameraCaptureModePhoto == self.captureMode) {
-        if ([_recordButton.titleLabel.text isEqualToString:@"Stop"]) {
-            [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
-            [_recordButton setBackgroundColor:[UIColor grayColor]];
-        }
-        CGFloat positionY = 72;
-        CGFloat heightPreviewView = SCREEN_HEIGHT - positionY - 90;
-        _previewView.frame = CGRectMake(MARGIN_ALL_BORDER, positionY, SCREEN_WIDTH - MARGIN_ALL_BORDER * 2, heightPreviewView);
-        [self.previewView setNeedsLayout];
-    }else if (FYCameraCaptureModeMovie == self.captureMode){
-        CGRect rect = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
-        _previewView.frame = rect;
-        [self.previewView setNeedsLayout];
+        dispatch_async(self.sessionQueue, ^{
+            AVCaptureMovieFileOutput *movieFileOutput = [[AVCaptureMovieFileOutput alloc] init];
+            if ([self.session canAddOutput:movieFileOutput]) {
+                [self.session beginConfiguration];
+                [self.session addOutput:movieFileOutput];
+                self.session.sessionPreset = AVCaptureSessionPresetHigh;
+                AVCaptureConnection *connection = [movieFileOutput connectionWithMediaType:AVMediaTypeVideo];
+                if (connection.isVideoMirroringSupported) {
+                    connection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
+                }
+                [self.session commitConfiguration];
+                self.moviceFileOutput = movieFileOutput;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    self.recordButton.enabled = YES;
+                });
+            }
+        });
     }
 }
 

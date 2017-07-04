@@ -7,7 +7,15 @@
 //
 
 #import <Foundation/Foundation.h>
+#import <AVFoundation/AVFoundation.h>
 
-@interface FYCameraKitPhotoCaptureDelegate : NSObject
+@interface FYCameraKitPhotoCaptureDelegate : NSObject<AVCapturePhotoCaptureDelegate>
+
+- (instancetype)initWithRequestedPhotoSetting:(AVCapturePhotoSettings *)requestedSettings
+                    willCapturePhotoAnimation:(void (^)(void))willsCapturePhotoAnimation
+                           capturingLivePhoto:(void (^)(BOOL capturing))capturingLivePhoto
+                                    completed:(void (^)(FYCameraKitPhotoCaptureDelegate *photoCaptureDelegate))complete;
+
+@property(nonatomic, readonly) AVCapturePhotoSettings *requestPhotoSettings;
 
 @end
