@@ -25,6 +25,7 @@
 		873B8AEB1B1F5CCA007FD442 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 873B8AEA1B1F5CCA007FD442 /* Main.storyboard */; };
 		AE7949171F04F03500DD79EB /* FYPreviewView.m in Sources */ = {isa = PBXBuildFile; fileRef = AE7949161F04F03500DD79EB /* FYPreviewView.m */; };
 		AED6E8121F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = AED6E8111F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.m */; };
+		AEFFEDA11F0E121600577107 /* FYAlertController.m in Sources */ = {isa = PBXBuildFile; fileRef = AEFFEDA01F0E121600577107 /* FYAlertController.m */; };
 		E4B4E1D4D68E334C43CB0162 /* Pods_FYCameraKit_Example.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 627222FBE3AD80DE56EA46C9 /* Pods_FYCameraKit_Example.framework */; };
 /* End PBXBuildFile section */
 
@@ -72,6 +73,8 @@
 		AE7949161F04F03500DD79EB /* FYPreviewView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FYPreviewView.m; sourceTree = "<group>"; };
 		AED6E8101F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FYCameraKitPhotoCaptureDelegate.h; sourceTree = "<group>"; };
 		AED6E8111F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FYCameraKitPhotoCaptureDelegate.m; sourceTree = "<group>"; };
+		AEFFED9F1F0E121600577107 /* FYAlertController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FYAlertController.h; sourceTree = "<group>"; };
+		AEFFEDA01F0E121600577107 /* FYAlertController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FYAlertController.m; sourceTree = "<group>"; };
 		C863D964403E1BC76C7D7417 /* LICENSE */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text; name = LICENSE; path = ../LICENSE; sourceTree = "<group>"; };
 		EF87FCBB264DF2AA6448E2F2 /* Pods-FYCameraKit_Tests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-FYCameraKit_Tests.release.xcconfig"; path = "Pods/Target Support Files/Pods-FYCameraKit_Tests/Pods-FYCameraKit_Tests.release.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -146,6 +149,8 @@
 				AED6E8111F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.m */,
 				AE7949151F04F03500DD79EB /* FYPreviewView.h */,
 				AE7949161F04F03500DD79EB /* FYPreviewView.m */,
+				AEFFED9F1F0E121600577107 /* FYAlertController.h */,
+				AEFFEDA01F0E121600577107 /* FYAlertController.m */,
 				6003F5A5195388D20070C39A /* FYViewController.h */,
 				6003F5A6195388D20070C39A /* FYViewController.m */,
 				71719F9D1E33DC2100824A3D /* LaunchScreen.storyboard */,
@@ -412,6 +417,7 @@
 				6003F59E195388D20070C39A /* FYAppDelegate.m in Sources */,
 				6003F5A7195388D20070C39A /* FYViewController.m in Sources */,
 				AE7949171F04F03500DD79EB /* FYPreviewView.m in Sources */,
+				AEFFEDA11F0E121600577107 /* FYAlertController.m in Sources */,
 				AED6E8121F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.m in Sources */,
 				6003F59A195388D20070C39A /* main.m in Sources */,
 			);

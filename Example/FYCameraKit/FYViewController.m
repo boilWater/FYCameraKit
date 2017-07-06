@@ -9,8 +9,11 @@
 #import "FYViewController.h"
 #import "FYCameraKit-PrefixHeader.pch"
 #import "FYPreviewView.h"
+#import "FYAlertController.h"
 #import "FYCameraKitPhotoCaptureDelegate.h"
 #import <AVFoundation/AVFoundation.h>
+
+static void * SessionRunningContext = &SessionRunningContext;
 
 typedef NS_ENUM(NSInteger, FYCameraCaptureSetupResult) {
     FYCameraCaptureSetupResultSuccess,
@@ -59,7 +62,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 @property(nonatomic) dispatch_queue_t sessionQueue;
 @property(nonatomic) AVCaptureSession *session;
 @property(nonatomic, getter=isSessionRunning) BOOL sessionRunning;
-@property(nonatomic) AVCaptureInput *videoDeviceInput;
+@property(nonatomic) AVCaptureDeviceInput *videoDeviceInput;
 
 //device
 @property(nonatomic, strong) UIButton *cameraButton;
@@ -101,19 +104,21 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
         switch (self.setupResult) {
             case FYCameraCaptureSetupResultSuccess:
             {
-                //[self addObserver];
+                [self addObserver];
                 [self.session startRunning];
                 self.sessionRunning = self.session.running;
                 break;
             }
             case FYCameraCaptureSetupResultNotAuthorized:
             {
-                
+                FYAlertController *alertController = [FYAlertController alertControllerWithTitle:@"Error" message:@"Session Not Authorized" preferredStyle:UIAlertControllerStyleAlert cancelActionTitle:@"cancel"];
+                [self presentViewController:alertController animated:YES completion:nil];
                 break;
             }
             case FYCameraCaptureSetupResultSessionConfigurationFailed:
             {
-                
+                FYAlertController *alertController = [FYAlertController alertControllerWithTitle:@"Error" message:@"Session Not Authorized" preferredStyle:UIAlertControllerStyleAlert cancleActionTitle:@"cancel" settingActionTitle:@"setting"];
+                [self presentViewController:alertController animated:YES completion:nil];
                 break;
             }
             default:
@@ -127,7 +132,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
     dispatch_async(self.sessionQueue, ^{
         if (FYCameraCaptureSetupResultSuccess == self.setupResult) {
             [self.session stopRunning];
-            //[self removeObservers];
+            [self removeObservers];
         }
     });
     [super viewDidDisappear:animated];
@@ -584,4 +589,108 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
     return error;
 }
 
+#pragma mark - KVO and Notifications
+
+- (void)addObserver {
+    [self.session addObserver:self forKeyPath:@"running" options:NSKeyValueObservingOptionNew context:SessionRunningContext];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(subjectAreaDidChangeWithNotification:) name:AVCaptureDeviceSubjectAreaDidChangeNotification object:self.videoDeviceInput.device];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(sessionRuntimeErrorWithNotification:) name:AVCaptureSessionRuntimeErrorNotification object:self.session];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(sessionWasInterruptedWithNotification:) name:AVCaptureSessionWasInterruptedNotification object:self.session];
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(sessionInterruptionEndedWithNotification:) name:AVCaptureSessionInterruptionEndedNotification object:self.session];
+}
+
+- (void)removeObservers {
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+    [self.session removeObserver:self forKeyPath:@"running" context:SessionRunningContext];
+}
+
+- (void)observeValueForKeyPath:(NSString *)keyPath ofObject:(id)object change:(NSDictionary<NSKeyValueChangeKey,id> *)change context:(void *)context {
+    if (SessionRunningContext == context) {
+        BOOL isSessionRunning =[change[NSKeyValueChangeNewKey] boolValue];
+        BOOL livePhotoCaptureEnable = self.photoOutput.livePhotoCaptureEnabled;
+        BOOL livePhotoCaptureSupported = self.photoOutput.livePhotoCaptureSupported;
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.livePhotoModeButton.enabled = isSessionRunning && livePhotoCaptureEnable;
+            self.livePhotoModeButton.hidden =  !(isSessionRunning && livePhotoCaptureSupported);
+            self.captureModeControl.enabled = isSessionRunning;
+            self.recordButton.enabled = isSessionRunning && (FYCameraCaptureModeMovie == self.captureMode);
+            self.photoButton.enabled = isSessionRunning;
+            self.cameraButton.enabled = isSessionRunning && (self.videoDeviceDiscoverySession.uniqueDevicePositionsCount >  1);
+        });
+        
+    }else {
+        [super observeValueForKeyPath:keyPath ofObject:object change:change context:context];
+    }
+}
+
+- (void)subjectAreaDidChangeWithNotification:(NSNotification *)notification {
+//    [self ];
+}
+
+- (void)sessionRuntimeErrorWithNotification:(NSNotification *)notification {
+    NSError *error = notification.userInfo[AVCaptureSessionErrorKey];
+    if (AVErrorMediaServicesWereReset == error.code) {
+        dispatch_async(self.sessionQueue, ^{
+            if (self.isSessionRunning) {
+                [self.session startRunning];
+                self.sessionRunning = self.session.running;
+            }else {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    self.resumeButton.hidden = NO;
+                });
+            }
+        });
+    }else {
+        self.resumeButton.hidden = NO;
+    }
+}
+
+- (void)sessionWasInterruptedWithNotification:(NSNotification *)notification {
+    
+    BOOL isShowResumeButton = NO;
+     AVCaptureSessionInterruptionReason interruptionReason = [notification.userInfo[AVCaptureSessionInterruptionReasonKey] integerValue];
+    if (AVCaptureSessionInterruptionReasonAudioDeviceInUseByAnotherClient == interruptionReason || AVCaptureSessionInterruptionReasonVideoDeviceInUseByAnotherClient == interruptionReason) {
+        isShowResumeButton = YES;
+    }else if (AVCaptureSessionInterruptionReasonVideoDeviceNotAvailableWithMultipleForegroundApps == interruptionReason){
+        self.cameraUnavailableLabel.alpha = 0.0f;
+        self.cameraUnavailableLabel.hidden = NO;
+        NSTimeInterval duration = 0.35;
+        [UIView animateWithDuration:duration animations:^{
+            self.cameraUnavailableLabel.alpha = 1.0;
+        }];
+    }
+    
+    if (isShowResumeButton) {
+        self.resumeButton.alpha = 0.0f;
+        self.resumeButton.hidden = NO;
+        NSTimeInterval duration = 0.35;
+        [UIView animateWithDuration:duration animations:^{
+            self.resumeButton.alpha = 1.0f;
+        }];
+    }
+}
+
+- (void)sessionInterruptionEndedWithNotification:(NSNotification *)notification {
+    if (!self.resumeButton.hidden) {
+        NSTimeInterval duration = 0.25;
+        [UIView animateWithDuration:duration animations:^{
+            self.resumeButton.alpha = 0.0f;
+        } completion:^(BOOL finished) {
+            self.resumeButton.hidden = YES;
+        }];
+    }
+    if (! self.cameraUnavailableLabel.hidden) {
+        NSTimeInterval duration = 0.25;
+        [UIView animateWithDuration:duration animations:^{
+            self.cameraUnavailableLabel.alpha = 0.0f;
+        } completion:^(BOOL finished) {
+            self.cameraUnavailableLabel.hidden = YES;
+        }];
+    }
+}
+
 @end
+    
