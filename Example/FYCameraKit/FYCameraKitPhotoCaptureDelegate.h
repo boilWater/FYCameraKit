@@ -14,7 +14,7 @@
 - (instancetype)initWithRequestedPhotoSetting:(AVCapturePhotoSettings *)requestedSettings
                     willCapturePhotoAnimation:(void (^)(void))willsCapturePhotoAnimation
                            capturingLivePhoto:(void (^)(BOOL capturing))capturingLivePhoto
-                                    completed:(void (^)(FYCameraKitPhotoCaptureDelegate *photoCaptureDelegate))complete;
+                                    completed:(void (^)(FYCameraKitPhotoCaptureDelegate *photoCaptureDelegate))completionHandler;
 
 @property(nonatomic, readonly) AVCapturePhotoSettings *requestPhotoSettings;
 
