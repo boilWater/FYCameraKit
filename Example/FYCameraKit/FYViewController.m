@@ -382,9 +382,40 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
             NSString *livePhotoMoviceFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[livePhotoMoviceFileName stringByAppendingPathExtension:@"mov"]];
             photoSetting.livePhotoMovieFileURL = [NSURL URLWithString:livePhotoMoviceFilePath];
         }
-        
-        //add FYCameraKitPhotoCaptureDelegate
-        
+        FYCameraKitPhotoCaptureDelegate *photoCaptureDelegate = [[FYCameraKitPhotoCaptureDelegate alloc] initWithRequestedPhotoSetting:photoSetting willCapturePhotoAnimation:^{
+            dispatch_async(dispatch_get_main_queue(), ^{
+                self.previewView.videoPreviewLayer.opacity = 0.0f;
+                NSTimeInterval duration = 0.30f;
+                [UIView animateWithDuration:duration animations:^{
+                    self.previewView.videoPreviewLayer.opacity = 1.0f;
+                }];
+            });
+            
+        } capturingLivePhoto:^(BOOL capturing) {
+            dispatch_async(self.sessionQueue, ^{
+                if (capturing) {
+                    self.inProgressPhotoCaptureCount++;
+                }else {
+                    self.inProgressPhotoCaptureCount--;
+                }
+                NSInteger inProgressPhotoCaptureCount = self.inProgressPhotoCaptureCount;
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (inProgressPhotoCaptureCount > 0) {
+                        self.capturingLivePhotoLabel.hidden = NO;
+                    }else if(inProgressPhotoCaptureCount == 0) {
+                        self.capturingLivePhotoLabel.hidden = YES;
+                    }else {
+                        NSLog(@"Error ");
+                    }
+                });
+            });
+        } completed:^(FYCameraKitPhotoCaptureDelegate *photoCaptureDelegate) {
+            dispatch_async(self.sessionQueue, ^{
+                self.inProgressPhotoCaptureDelegate[@(photoCaptureDelegate.requestPhotoSettings.uniqueID)] = nil;
+            });
+        }];
+    self.inProgressPhotoCaptureDelegate[@(photoCaptureDelegate.requestPhotoSettings.uniqueID)] = photoCaptureDelegate;
+        [self.photoOutput capturePhotoWithSettings:photoSetting delegate:photoCaptureDelegate];
     });
 }
 
