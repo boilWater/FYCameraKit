@@ -7,8 +7,6 @@
 //
 
 @import UIKit;
-#import <AVFoundation/AVCaptureSessionPreset.h>
-#import <AVFoundation/AVCaptureDevice.h>
 
 @interface FYViewController : UIViewController
 

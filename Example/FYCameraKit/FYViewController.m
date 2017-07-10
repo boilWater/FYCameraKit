@@ -12,6 +12,7 @@
 #import "FYAlertController.h"
 #import "FYCameraKitPhotoCaptureDelegate.h"
 #import <AVFoundation/AVFoundation.h>
+#import <Photos/Photos.h>
 
 static void * SessionRunningContext = &SessionRunningContext;
 
@@ -22,13 +23,19 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureSetupResult) {
 };
 
 typedef NS_ENUM(NSInteger, FYCameraLivePhotoMode) {
-    FYCameraLivePhotoModeOn = 0,
-    FYCameraLivePhotoModeOff = 1
+    FYCameraLivePhotoModeOff = 0,
+    FYCameraLivePhotoModeOn = 1
 };
 
 typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
     FYCameraCaptureModePhoto = 0,
     FYCameraCaptureModeMovie = 1
+};
+
+typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
+    FYCameraRecordModeNot,
+    FYCameraRecordModeStarted,
+    FYCameraRecordModeStoped
 };
 
 @interface AVCaptureDeviceDiscoverySession (Utilities)
@@ -51,7 +58,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 
 @end
 
-@interface FYViewController ()
+@interface FYViewController ()<AVCaptureFileOutputRecordingDelegate>
 
 //session
 @property(nonatomic) FYPreviewView *previewView;
@@ -75,6 +82,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 @property(nonatomic, strong) UIView *focusView; //point of camera
 @property(nonatomic, strong) UILabel *capturingLivePhotoLabel;
 @property(nonatomic) FYCameraLivePhotoMode livePhotoMode;
+@property(nonatomic) FYCameraRecordMode recordMode;
 
 @property(nonatomic) AVCapturePhotoOutput *photoOutput;
 @property(nonatomic) NSMutableDictionary<NSNumber *, FYCameraKitPhotoCaptureDelegate *> *inProgressPhotoCaptureDelegate;
@@ -171,7 +179,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
     
     self.session = [[AVCaptureSession alloc] init];
     
-    NSArray<AVCaptureDeviceType> *deviceType = @[AVCaptureDeviceTypeBuiltInWideAngleCamera, AVCaptureDeviceTypeBuiltInDuoCamera];
+    NSArray<AVCaptureDeviceType> *deviceType = @[AVCaptureDeviceTypeBuiltInWideAngleCamera, AVCaptureDeviceTypeBuiltInDualCamera];
     self.videoDeviceDiscoverySession = [AVCaptureDeviceDiscoverySession discoverySessionWithDeviceTypes:deviceType mediaType:AVMediaTypeVideo position:AVCaptureDevicePositionUnspecified];
     
     self.previewView.session = self.session;
@@ -203,7 +211,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
             break;
         }
     }
-    
+    //在线程中初始化 AVCaptureSession 中的 Call Blocks 会花费时间
     dispatch_async(self.sessionQueue, ^{
         [self configurationSession];
     });
@@ -217,7 +225,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
     [self.session beginConfiguration];
     self.session.sessionPreset = AVCaptureSessionPresetPhoto;
     
-    AVCaptureDevice *videoDevice = [AVCaptureDevice defaultDeviceWithDeviceType:AVCaptureDeviceTypeBuiltInDuoCamera mediaType:AVMediaTypeVideo position:AVCaptureDevicePositionBack];
+    AVCaptureDevice *videoDevice = [AVCaptureDevice defaultDeviceWithDeviceType:AVCaptureDeviceTypeBuiltInDualCamera mediaType:AVMediaTypeVideo position:AVCaptureDevicePositionBack];
     if (!videoDevice) {
         videoDevice = [AVCaptureDevice defaultDeviceWithDeviceType:AVCaptureDeviceTypeBuiltInWideAngleCamera mediaType:AVMediaTypeVideo position:AVCaptureDevicePositionBack];
         
@@ -326,9 +334,11 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
                 [livePhotoButton setTitle:NSLocalizedString(@"live photo off", nil) forState:UIControlStateNormal];
                 livePhotoButton.alpha = 0.8;
                 livePhotoButton.backgroundColor = [UIColor lightGrayColor];
+                _capturingLivePhotoLabel.hidden = FYCameraLivePhotoModeOff;
             }else {
                 [livePhotoButton setTitle:NSLocalizedString(@"live photo on", nil) forState:UIControlStateNormal];
                 livePhotoButton.backgroundColor = [UIColor grayColor];
+                _capturingLivePhotoLabel.hidden = FYCameraLivePhotoModeOn;
             }
         });
     });
@@ -352,16 +362,52 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 }
 
 - (void)recordClickEventWithButton:(UIButton *)recordButton {
-    if (0 == _captureModeControl.selectedSegmentIndex) {
+    if (FYCameraCaptureModePhoto == self.captureMode) {
         return;
     }
-    if ([recordButton.titleLabel.text isEqualToString:@"Record"] && _captureModeControl.selectedSegmentIndex == 1) {
-        [recordButton setTitle:@"Stop" forState:UIControlStateNormal];
-        [recordButton setBackgroundColor:[UIColor redColor]];
-    }else{
-        [recordButton setTitle:@"Record" forState:UIControlStateNormal];
-        [recordButton setBackgroundColor:[UIColor grayColor]];
-    }
+    self.recordMode = (FYCameraRecordModeStarted == self.recordMode) ? FYCameraRecordModeStoped : FYCameraRecordModeStarted;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (FYCameraRecordModeStarted == self.recordMode) {
+            [recordButton setTitle:NSLocalizedString(@"Stop", nil) forState:UIControlStateNormal];
+            [recordButton setBackgroundColor:[UIColor redColor]];
+        }else if (FYCameraRecordModeStoped == self.recordMode){
+            [recordButton setTitle:NSLocalizedString(@"Record", nil) forState:UIControlStateNormal];
+            [recordButton setBackgroundColor:[UIColor grayColor]];
+        }else {
+            
+        }
+    });
+    
+    self.recordButton.enabled = NO;
+    self.cameraButton.enabled = NO;
+    self.captureModeControl.enabled = NO;
+    
+    AVCaptureVideoOrientation videoPreviewLayerVideoOrientation =  self.previewView.videoPreviewLayer.connection.videoOrientation;
+    
+    dispatch_async(self.sessionQueue, ^{
+        if (!self.moviceFileOutput.isRecording) {
+            if ([UIDevice currentDevice].isMultitaskingSupported) {
+                self.backgroundTaskIdentifier = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:nil];
+            }
+            AVCaptureConnection *movieFileOutputConnection = [self.moviceFileOutput connectionWithMediaType:AVMediaTypeVideo];
+            movieFileOutputConnection.videoOrientation = videoPreviewLayerVideoOrientation;
+            
+            if (@available(iOS 11.0, *)) {
+                if ([self.moviceFileOutput.availableVideoCodecTypes containsObject:AVVideoCodecTypeHEVC]) {
+                    NSDictionary<NSString *, id> *videOutputCodecType = @{AVVideoCodecKey : AVVideoCodecTypeHEVC};
+                    [self.moviceFileOutput setOutputSettings:videOutputCodecType forConnection:movieFileOutputConnection];
+                }
+                
+                NSString *outputFileName = [NSUUID UUID].UUIDString;
+                NSString *outputFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[outputFileName stringByAppendingPathExtension:@"mov"]];
+                [self.moviceFileOutput startRecordingToOutputFileURL:[NSURL URLWithString:outputFilePath] recordingDelegate:self];
+            } else {
+                // Fallback on earlier versions
+            }
+        }else {
+            [self.moviceFileOutput stopRecording];
+        }
+    });
 }
 
 - (void)photoClickEventWithButton:(UIButton *)photoButton {
@@ -420,7 +466,87 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 }
 
 - (void)cameraClickEventWithButton:(UIButton *)cameraButton {
+    self.photoButton.enabled = NO;
+    self.cameraButton.enabled = NO;
+    self.recordButton.enabled = NO;
+    self.livePhotoModeButton.enabled = NO;
+    self.captureModeControl.enabled = NO;
     
+    dispatch_async(self.sessionQueue, ^{
+        AVCaptureDevice *currentVideoDevice = self.videoDeviceInput.device;
+        AVCaptureDevicePosition currentVideoPosition = currentVideoDevice.position;
+        
+        AVCaptureDevicePosition preferredPosition;;
+        AVCaptureDeviceType preferredDeviceType;
+        
+        switch (currentVideoPosition) {
+            case AVCaptureDevicePositionUnspecified:
+            case AVCaptureDevicePositionFront:
+            {
+                preferredPosition = AVCaptureDevicePositionBack;
+                preferredDeviceType = AVCaptureDeviceTypeBuiltInDualCamera;
+                break;
+            }
+            case AVCaptureDevicePositionBack:
+            {
+                preferredPosition = AVCaptureDevicePositionFront;
+                preferredDeviceType = AVCaptureDeviceTypeBuiltInWideAngleCamera;
+                break;
+            }
+        }
+        
+        NSArray<AVCaptureDevice *> *devices = self.videoDeviceDiscoverySession.devices;
+        AVCaptureDevice *newVideoDevice = nil;
+        
+        for (AVCaptureDevice *device in devices) {
+            if (device.position == preferredPosition && device.deviceType == preferredDeviceType) {
+                newVideoDevice = device;
+            }
+        }
+        if (!newVideoDevice) {
+            for (AVCaptureDevice *device in devices) {
+                if (device.position == preferredPosition) {
+                    newVideoDevice = device;
+                }
+            }
+        }
+        
+        if (newVideoDevice) {
+            AVCaptureDeviceInput *videoDeviceInput = [AVCaptureDeviceInput deviceInputWithDevice:newVideoDevice error:NULL];
+            
+            [self.session beginConfiguration];
+            [self.session removeInput:self.videoDeviceInput];
+            
+            if ([self.session canAddInput:videoDeviceInput]) {
+                [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureDeviceSubjectAreaDidChangeNotification object:currentVideoDevice];
+                
+                [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(subjectAreaDidChangeWithNotification:) name:AVCaptureDeviceSubjectAreaDidChangeNotification object:newVideoDevice];
+                
+                [self.session addInput:videoDeviceInput];
+                self.videoDeviceInput = videoDeviceInput;
+            }else {
+                [self.session addInput:self.videoDeviceInput];
+            }
+            
+            AVCaptureConnection *movieFileOutputconnection = [self.moviceFileOutput connectionWithMediaType:AVMediaTypeVideo];
+            if (movieFileOutputconnection.isVideoStabilizationSupported) {
+                movieFileOutputconnection.preferredVideoStabilizationMode = AVCaptureVideoStabilizationModeAuto;
+            }
+            
+            self.photoOutput.livePhotoCaptureEnabled = self.photoOutput.livePhotoCaptureSupported;
+            
+            [self.session commitConfiguration];
+        }
+        
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.cameraButton.enabled = YES;
+            self.recordButton.enabled = self.captureModeControl.selectedSegmentIndex == FYCameraCaptureModeMovie;
+            self.photoButton.enabled = YES;
+            
+            self.livePhotoModeButton.enabled = YES;
+            self.captureModeControl.enabled = YES;
+        });
+    });
 }
 
 #pragma mark - lazy loaded
@@ -449,7 +575,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
         _capturingLivePhotoLabel = [[UILabel alloc] initWithFrame:CGRectMake(positionX, positionY, widthCaptureingLivePhotoLabel, heightCaptureingLivePhotoLabel)];
         _capturingLivePhotoLabel.text = @"Live";
         _capturingLivePhotoLabel.backgroundColor = [UIColor yellowColor];
-//        _capturingLivePhotoLabel.hidden = YES;
+        //        _capturingLivePhotoLabel.hidden = YES;
         _capturingLivePhotoLabel.textAlignment = NSTextAlignmentCenter;
         _capturingLivePhotoLabel.layer.cornerRadius = 3.0f;
         _capturingLivePhotoLabel.clipsToBounds = YES;
@@ -463,6 +589,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
         CGFloat positionY = 72;
         CGFloat heightPreviewView = SCREEN_HEIGHT - positionY - 90;
         _previewView = [[FYPreviewView alloc] initWithFrame:CGRectMake(MARGIN_ALL_BORDER, positionY, SCREEN_WIDTH - MARGIN_ALL_BORDER * 2, heightPreviewView)];
+        _previewView.videoPreviewLayer.videoGravity = AVLayerVideoGravityResizeAspectFill;
         _previewView.backgroundColor = [UIColor lightGrayColor];
     }
     return _previewView;
@@ -529,7 +656,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
     button.layer.cornerRadius = 6.0f;
     button.clipsToBounds = YES;
     button.backgroundColor = [UIColor grayColor];
-//    [button addTarget:self action:@selector(selector) forControlEvents:UIControlEventTouchDown];
+    //    [button addTarget:self action:@selector(selector) forControlEvents:UIControlEventTouchDown];
     return button;
 }
 
@@ -548,20 +675,17 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
                 }else if (FYCameraLivePhotoModeOff == self.livePhotoMode) {
                     _capturingLivePhotoLabel.hidden = YES;
                 }
-                if ([_recordButton.titleLabel.text isEqualToString:@"Stop"]) {
-                    [_recordButton setTitle:@"Record" forState:UIControlStateNormal];
-                    [_recordButton setBackgroundColor:[UIColor grayColor]];
-                }
+                
                 CGFloat positionY = 72;
                 CGFloat heightPreviewView = SCREEN_HEIGHT - positionY - 90;
                 _previewView.frame = CGRectMake(MARGIN_ALL_BORDER, positionY, SCREEN_WIDTH - MARGIN_ALL_BORDER * 2, heightPreviewView);
-                [self.previewView setNeedsLayout];
+                [self.view setNeedsLayout];
             }else if (FYCameraCaptureModeMovie == captureMode) {
                 _livePhotoModeButton.hidden = YES;
                 _capturingLivePhotoLabel.hidden = YES;
                 CGRect rect = CGRectMake(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
                 _previewView.frame = rect;
-                [self.previewView setNeedsLayout];
+                [self.view setNeedsLayout];
             }
         });
     });
@@ -658,7 +782,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 }
 
 - (void)subjectAreaDidChangeWithNotification:(NSNotification *)notification {
-//    [self ];
+    //    [self ];
 }
 
 - (void)sessionRuntimeErrorWithNotification:(NSNotification *)notification {
@@ -682,7 +806,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
 - (void)sessionWasInterruptedWithNotification:(NSNotification *)notification {
     
     BOOL isShowResumeButton = NO;
-     AVCaptureSessionInterruptionReason interruptionReason = [notification.userInfo[AVCaptureSessionInterruptionReasonKey] integerValue];
+    AVCaptureSessionInterruptionReason interruptionReason = [notification.userInfo[AVCaptureSessionInterruptionReasonKey] integerValue];
     if (AVCaptureSessionInterruptionReasonAudioDeviceInUseByAnotherClient == interruptionReason || AVCaptureSessionInterruptionReasonVideoDeviceInUseByAnotherClient == interruptionReason) {
         isShowResumeButton = YES;
     }else if (AVCaptureSessionInterruptionReasonVideoDeviceNotAvailableWithMultipleForegroundApps == interruptionReason){
@@ -713,7 +837,7 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
             self.resumeButton.hidden = YES;
         }];
     }
-    if (! self.cameraUnavailableLabel.hidden) {
+    if (!self.cameraUnavailableLabel.hidden) {
         NSTimeInterval duration = 0.25;
         [UIView animateWithDuration:duration animations:^{
             self.cameraUnavailableLabel.alpha = 0.0f;
@@ -721,6 +845,67 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
             self.cameraUnavailableLabel.hidden = YES;
         }];
     }
+}
+
+#pragma mark - AVCaptureFileOutputRecordingDelegate
+
+- (void)captureOutput:(AVCaptureFileOutput *)output didStartRecordingToOutputFileAtURL:(NSURL *)fileURL fromConnections:(NSArray<AVCaptureConnection *> *)connections {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.recordButton.enabled = YES;
+        [self.recordButton setTitle:NSLocalizedString(@"Stop", nil) forState:UIControlStateNormal];
+    });
+}
+
+- (void)captureOutput:(nonnull AVCaptureFileOutput *)output didFinishRecordingToOutputFileAtURL:(nonnull NSURL *)outputFileURL fromConnections:(nonnull NSArray<AVCaptureConnection *> *)connections error:(nullable NSError *)error {
+    UIBackgroundTaskIdentifier currentBackgroundRecordingID = self.backgroundTaskIdentifier;
+    self.backgroundTaskIdentifier = UIBackgroundTaskInvalid;
+    
+    dispatch_block_t cleanUp = ^{
+        if ([[NSFileManager defaultManager] fileExistsAtPath:outputFileURL.path]) {
+            [[NSFileManager defaultManager] removeItemAtPath:outputFileURL.path error:NULL];
+            
+            if (currentBackgroundRecordingID != UIBackgroundTaskInvalid) {
+                [[UIApplication sharedApplication] endBackgroundTask:currentBackgroundRecordingID];
+            }
+        }
+    };
+    
+    BOOL success = YES;
+    
+    if (error) {
+        NSLog(@"Error movie file finishing : %@", error);
+       success = [error.userInfo[AVErrorRecordingSuccessfullyFinishedKey] boolValue];
+    }
+    
+    if (success) {
+        [PHPhotoLibrary requestAuthorization:^(PHAuthorizationStatus status) {
+            if (PHAuthorizationStatusAuthorized == status) {
+                [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
+                    PHAssetResourceCreationOptions *options = [[PHAssetResourceCreationOptions alloc] init];
+                    options.shouldMoveFile = YES;
+                    
+                    PHAssetCreationRequest *creationRequest = [PHAssetCreationRequest creationRequestForAsset];
+                    [creationRequest addResourceWithType:PHAssetResourceTypeVideo fileURL:outputFileURL options:options];
+                } completionHandler:^(BOOL success, NSError * _Nullable error) {
+                    if (!success) {
+                        NSLog(@"Error: ");
+                    }
+                    cleanUp();
+                }];
+            }else {
+                cleanUp();
+            }
+        }];
+    }else {
+        cleanUp();
+    }
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        self.cameraButton.enabled = (self.videoDeviceDiscoverySession.uniqueDevicePositionsCount > 1);
+        self.recordButton.enabled = YES;
+        self.captureModeControl.enabled = YES;
+        [self.recordButton setTitle:NSLocalizedString(@"Record", nil) forState:UIControlStateNormal];
+    });
 }
 
 @end

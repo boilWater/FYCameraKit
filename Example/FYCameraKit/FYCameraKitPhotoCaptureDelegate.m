@@ -64,11 +64,11 @@
     if (nil != error) {
         NSLog(@"Error processing photo :%@ ", error);
     }
-#ifdef __IPHONE_11_0
-    self.photoData = [photo fileDataRepresentation];
-#else
-    self.photoData = nil;
-#endif
+    if (@available(iOS 11.0, *)) {
+        self.photoData = [photo fileDataRepresentation];
+    } else {
+        // Fallback on earlier versions
+    }
 }
 
 - (void)captureOutput:(AVCapturePhotoOutput *)output didFinishRecordingLivePhotoMovieForEventualFileAtURL:(nonnull NSURL *)outputFileURL
@@ -104,7 +104,11 @@
         if (PHAuthorizationStatusAuthorized == status) {
             [[PHPhotoLibrary sharedPhotoLibrary] performChanges:^{
                 PHAssetResourceCreationOptions *options = [[PHAssetResourceCreationOptions alloc] init];
-                options.uniformTypeIdentifier = self.requestPhotoSettings.processedFileType;
+                if (@available(iOS 11.0, *)) {
+                    options.uniformTypeIdentifier = self.requestPhotoSettings.processedFileType;
+                } else {
+                    // Fallback on earlier versions
+                }
                 
                 PHAssetCreationRequest *creationRequest = [PHAssetCreationRequest creationRequestForAsset];
                 [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:self.photoData options:options];
