@@ -23,8 +23,8 @@ typedef NS_ENUM(NSInteger, FYCameraCaptureSetupResult) {
 };
 
 typedef NS_ENUM(NSInteger, FYCameraLivePhotoMode) {
-    FYCameraLivePhotoModeOff = 0,
-    FYCameraLivePhotoModeOn = 1
+    FYCameraLivePhotoModeOn = 0,
+    FYCameraLivePhotoModeOff = 1
 };
 
 typedef NS_ENUM(NSInteger, FYCameraCaptureMode) {
@@ -330,7 +330,7 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
         FYCameraLivePhotoMode livePhotoMode = self.livePhotoMode;
         
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (FYCameraLivePhotoModeOn == livePhotoMode) {
+            if (FYCameraLivePhotoModeOff == livePhotoMode) {
                 [livePhotoButton setTitle:NSLocalizedString(@"live photo off", nil) forState:UIControlStateNormal];
                 livePhotoButton.alpha = 0.8;
                 livePhotoButton.backgroundColor = [UIColor lightGrayColor];
@@ -400,7 +400,7 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
                 
                 NSString *outputFileName = [NSUUID UUID].UUIDString;
                 NSString *outputFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[outputFileName stringByAppendingPathExtension:@"mov"]];
-                [self.moviceFileOutput startRecordingToOutputFileURL:[NSURL URLWithString:outputFilePath] recordingDelegate:self];
+                [self.moviceFileOutput startRecordingToOutputFileURL:[NSURL fileURLWithPath:outputFilePath] recordingDelegate:self];
             } else {
                 // Fallback on earlier versions
             }
@@ -417,18 +417,28 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
         AVCaptureConnection *photoOutputConnection = [self.photoOutput connectionWithMediaType:AVMediaTypeVideo];
         photoOutputConnection.videoOrientation = videoPreviewLayerVideoOrientation;
         
-        AVCapturePhotoSettings *photoSetting = [AVCapturePhotoSettings photoSettings];
-        photoSetting.flashMode = AVCaptureFlashModeAuto;
-        photoSetting.highResolutionPhotoEnabled = YES;
-        if (photoSetting.availablePreviewPhotoPixelFormatTypes.count > 0) {
-            photoSetting.previewPhotoFormat = @{(NSString *)kCVPixelBufferPixelFormatTypeKey : photoSetting.availablePreviewPhotoPixelFormatTypes.firstObject};
+        AVCapturePhotoSettings *photoSettings;
+        if (@available(iOS 11.0, *)) {
+            if ([self.photoOutput.availablePhotoCodecTypes containsObject:AVVideoCodecHEVC]) {
+                photoSettings = [AVCapturePhotoSettings photoSettingsWithFormat:@{AVVideoCodecKey:AVVideoCodecHEVC}];
+            }
+        } else {
+            photoSettings = [AVCapturePhotoSettings photoSettings];
+        }
+        if (self.videoDeviceInput.device.isFlashAvailable) {
+            photoSettings.flashMode = AVCaptureFlashModeOn;
+        }
+        photoSettings.highResolutionPhotoEnabled = YES;
+        if (photoSettings.availablePreviewPhotoPixelFormatTypes.count > 0) {
+            photoSettings.previewPhotoFormat = @{(NSString *)kCVPixelBufferPixelFormatTypeKey : photoSettings.availablePreviewPhotoPixelFormatTypes.firstObject};
         }
         if (self.livePhotoMode == FYCameraLivePhotoModeOn && self.photoOutput.livePhotoCaptureSupported) {
             NSString *livePhotoMoviceFileName = [NSUUID UUID].UUIDString;
             NSString *livePhotoMoviceFilePath = [NSTemporaryDirectory() stringByAppendingPathComponent:[livePhotoMoviceFileName stringByAppendingPathExtension:@"mov"]];
-            photoSetting.livePhotoMovieFileURL = [NSURL URLWithString:livePhotoMoviceFilePath];
+            photoSettings.livePhotoMovieFileURL = [NSURL fileURLWithPath:livePhotoMoviceFilePath];
         }
-        FYCameraKitPhotoCaptureDelegate *photoCaptureDelegate = [[FYCameraKitPhotoCaptureDelegate alloc] initWithRequestedPhotoSetting:photoSetting willCapturePhotoAnimation:^{
+        
+        FYCameraKitPhotoCaptureDelegate *photoCaptureDelegate = [[FYCameraKitPhotoCaptureDelegate alloc]  initWithRequestedPhotoSetting:photoSettings willCapturePhotoAnimation:^{
             dispatch_async(dispatch_get_main_queue(), ^{
                 self.previewView.videoPreviewLayer.opacity = 0.0f;
                 NSTimeInterval duration = 0.30f;
@@ -461,7 +471,7 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
             });
         }];
     self.inProgressPhotoCaptureDelegate[@(photoCaptureDelegate.requestPhotoSettings.uniqueID)] = photoCaptureDelegate;
-        [self.photoOutput capturePhotoWithSettings:photoSetting delegate:photoCaptureDelegate];
+        [self.photoOutput capturePhotoWithSettings:photoSettings delegate:photoCaptureDelegate];
     });
 }
 
@@ -656,15 +666,14 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
     button.layer.cornerRadius = 6.0f;
     button.clipsToBounds = YES;
     button.backgroundColor = [UIColor grayColor];
-    //    [button addTarget:self action:@selector(selector) forControlEvents:UIControlEventTouchDown];
     return button;
 }
 
 #pragma mark - privated Method (ClickEventInvocation)
 
 - (void)changeSegmentControlNeedsLayoutAndEventInvocation {
+    self.captureMode = (FYCameraCaptureModePhoto == self.captureMode) ? FYCameraCaptureModeMovie : FYCameraCaptureModePhoto;
     dispatch_async(self.sessionQueue, ^{
-        self.captureMode = (FYCameraCaptureModePhoto == self.captureMode) ? FYCameraCaptureModeMovie : FYCameraCaptureModePhoto;
         FYCameraCaptureMode captureMode = self.captureMode;
         dispatch_async(dispatch_get_main_queue(), ^{
             if (FYCameraCaptureModePhoto == captureMode) {

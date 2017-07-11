@@ -41,7 +41,7 @@
     if ([[NSFileManager defaultManager] fileExistsAtPath:self.livePhotoCompanionMovieURL.path]) {
         NSError *error = nil;
         [[NSFileManager defaultManager] removeItemAtPath:self.livePhotoCompanionMovieURL.path error: &error];
-        if (nil == error) {
+        if (nil != error) {
             NSLog(@"Error live photo Companion URL : %@",self.livePhotoCompanionMovieURL);
         }
     }
@@ -63,6 +63,7 @@
 - (void)captureOutput:(AVCapturePhotoOutput *)output didFinishProcessingPhoto:(AVCapturePhoto *)photo error:(NSError *)error {
     if (nil != error) {
         NSLog(@"Error processing photo :%@ ", error);
+        return;
     }
     if (@available(iOS 11.0, *)) {
         self.photoData = [photo fileDataRepresentation];
@@ -81,15 +82,16 @@
      photoDisplayTime:(CMTime)photoDisplayTime
      resolvedSettings:(AVCaptureResolvedPhotoSettings *)resolvedSettings
                 error:(NSError *)error {
-    if (nil == error) {
+    if (nil != error) {
         NSLog(@"Error process live photo movie : %@", error);
+        return;
     }
     self.livePhotoCompanionMovieURL = outputFileURL;
 }
 
 - (void)captureOutput:(AVCapturePhotoOutput *)output didFinishCaptureForResolvedSettings:(AVCaptureResolvedPhotoSettings *)resolvedSettings
                 error:(NSError *)error {
-    if (nil == error) {
+    if (nil != error) {
         NSLog(@"Error capture resolvedSettig : %@", error);
         [self didFinish];
         return;
@@ -112,10 +114,10 @@
                 
                 PHAssetCreationRequest *creationRequest = [PHAssetCreationRequest creationRequestForAsset];
                 [creationRequest addResourceWithType:PHAssetResourceTypePhoto data:self.photoData options:options];
-                if (nil == self.livePhotoCompanionMovieURL) {
+                if (nil != self.livePhotoCompanionMovieURL) {
                     PHAssetResourceCreationOptions *livePhotoCompanionCreationOptions = [[PHAssetResourceCreationOptions alloc] init];
                     livePhotoCompanionCreationOptions.shouldMoveFile = YES;
-                    [creationRequest addResourceWithType:PHAssetResourceTypeVideo fileURL:self.livePhotoCompanionMovieURL options:livePhotoCompanionCreationOptions];
+                    [creationRequest addResourceWithType:PHAssetResourceTypePairedVideo fileURL:self.livePhotoCompanionMovieURL options:livePhotoCompanionCreationOptions];
                 }
             } completionHandler:^(BOOL success, NSError * _Nullable error) {
                 if (!success) {
