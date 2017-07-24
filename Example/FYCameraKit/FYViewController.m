@@ -36,8 +36,7 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
     FYCameraRecordModeNot,
     FYCameraRecordModeStarted,
     FYCameraRecordModePaused,
-    FYCameraRecordModeSuspended,
-    FYCameraRecordModeFinished,
+    FYCameraRecordModeFinished
 };
 
 @interface AVCaptureDeviceDiscoverySession (Utilities)
@@ -77,7 +76,7 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
 //device
 @property(nonatomic, strong) UIButton *cameraButton;
 @property(nonatomic, strong) UILabel *cameraUnavailableLabel;
-@property(nonatomic) AVCaptureDeviceDiscoverySession *videoDeviceDiscoverySession;
+@property(nonatomic) AVCaptureDeviceDiscoverySession *videoDeviceDiscoverySession;//查找光学变焦的相机
 
 //capturing photos
 @property(nonatomic, strong) UIButton *photoButton; //take photo
@@ -245,6 +244,7 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
     
     //add video device input
     AVCaptureDeviceInput *videoDeviceInput = [AVCaptureDeviceInput deviceInputWithDevice:videoDevice error:&error];
+    
     if (!videoDeviceInput) {
         NSLog(@"error : ");
         self.setupResult = FYCameraCaptureSetupResultSessionConfigurationFailed;
@@ -287,6 +287,20 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
         [self.session addOutput:photoOutput];
         self.photoOutput = photoOutput;
         
+        AVCaptureDeviceFormat *currentDeviceFormat = videoDevice.activeFormat;
+        AVCaptureConnection *photoConnection = [photoOutput connectionWithMediaType:AVMediaTypeVideo];
+        
+        //添加图片防抖功能
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_8_0
+        if (![currentDeviceFormat isVideoStabilizationModeSupported:AVCaptureVideoStabilizationModeAuto]) {
+            [photoConnection setPreferredVideoStabilizationMode:AVCaptureVideoStabilizationModeAuto];
+        }
+#else
+        if (currentDeviceFormat.isVideoStabilizationSupported) {
+            photoConnection.enablesVideoStabilizationWhenAvailable = YES;
+        }
+        
+#endif
         self.photoOutput.highResolutionCaptureEnabled = YES;
         self.photoOutput.livePhotoCaptureEnabled = self.photoOutput.livePhotoCaptureSupported;
         self.livePhotoMode = self.photoOutput.livePhotoCaptureSupported ? FYCameraLivePhotoModeOn : FYCameraLivePhotoModeOff;
@@ -627,7 +641,19 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
             if ([UIDevice currentDevice].isMultitaskingSupported) {
                 self.backgroundTaskIdentifier = [[UIApplication sharedApplication] beginBackgroundTaskWithExpirationHandler:nil];
             }
+            AVCaptureDeviceFormat *movieActiveFormat = self.videoDeviceInput.device.activeFormat;
             AVCaptureConnection *movieFileOutputConnection = [self.moviceFileOutput connectionWithMediaType:AVMediaTypeVideo];
+            
+            //添加视频防抖功能
+#if __IPHONE_OS_VERSION_MAX_ALLOWED >= __IPHONE_8_0
+            if (![movieActiveFormat isVideoStabilizationModeSupported:AVCaptureVideoStabilizationModeAuto]) {
+                [movieFileOutputConnection setPreferredVideoStabilizationMode:AVCaptureVideoStabilizationModeAuto];
+            }
+#else
+            if (movieActiveFormat.videoStabilizationSupported) {
+                movieFileOutputConnection.enablesVideoStabilizationWhenAvailable = YES;
+            }
+#endif
             movieFileOutputConnection.videoOrientation = videoPreviewLayerVideoOrientation;
             
             if (@available(iOS 11.0, *)) {
