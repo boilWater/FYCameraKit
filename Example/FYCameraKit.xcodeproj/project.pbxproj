@@ -23,6 +23,7 @@
 		6003F5BC195388D20070C39A /* Tests.m in Sources */ = {isa = PBXBuildFile; fileRef = 6003F5BB195388D20070C39A /* Tests.m */; };
 		71719F9F1E33DC2100824A3D /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 71719F9D1E33DC2100824A3D /* LaunchScreen.storyboard */; };
 		873B8AEB1B1F5CCA007FD442 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 873B8AEA1B1F5CCA007FD442 /* Main.storyboard */; };
+		AE669FD91F3CA95C00622092 /* FYMeasurement.m in Sources */ = {isa = PBXBuildFile; fileRef = AE669FD81F3CA95C00622092 /* FYMeasurement.m */; };
 		AE7949171F04F03500DD79EB /* FYPreviewView.m in Sources */ = {isa = PBXBuildFile; fileRef = AE7949161F04F03500DD79EB /* FYPreviewView.m */; };
 		AED6E8121F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.m in Sources */ = {isa = PBXBuildFile; fileRef = AED6E8111F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.m */; };
 		AEFFEDA11F0E121600577107 /* FYAlertController.m in Sources */ = {isa = PBXBuildFile; fileRef = AEFFEDA01F0E121600577107 /* FYAlertController.m */; };
@@ -69,6 +70,8 @@
 		873B8AEA1B1F5CCA007FD442 /* Main.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = Main.storyboard; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		87E1C8AC0B36133A93B84536 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; name = README.md; path = ../README.md; sourceTree = "<group>"; };
 		AE33B3671EFCF160001351B2 /* FYCameraKit-PrefixHeader.pch */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "FYCameraKit-PrefixHeader.pch"; sourceTree = "<group>"; };
+		AE669FD71F3CA95C00622092 /* FYMeasurement.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FYMeasurement.h; sourceTree = "<group>"; };
+		AE669FD81F3CA95C00622092 /* FYMeasurement.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FYMeasurement.m; sourceTree = "<group>"; };
 		AE7949151F04F03500DD79EB /* FYPreviewView.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FYPreviewView.h; sourceTree = "<group>"; };
 		AE7949161F04F03500DD79EB /* FYPreviewView.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = FYPreviewView.m; sourceTree = "<group>"; };
 		AED6E8101F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = FYCameraKitPhotoCaptureDelegate.h; sourceTree = "<group>"; };
@@ -176,6 +179,7 @@
 		6003F5B5195388D20070C39A /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				AE669FD61F3CA90100622092 /* Measurement */,
 				6003F5BB195388D20070C39A /* Tests.m */,
 				6003F5B6195388D20070C39A /* Supporting Files */,
 			);
@@ -200,6 +204,15 @@
 				C863D964403E1BC76C7D7417 /* LICENSE */,
 			);
 			name = "Podspec Metadata";
+			sourceTree = "<group>";
+		};
+		AE669FD61F3CA90100622092 /* Measurement */ = {
+			isa = PBXGroup;
+			children = (
+				AE669FD71F3CA95C00622092 /* FYMeasurement.h */,
+				AE669FD81F3CA95C00622092 /* FYMeasurement.m */,
+			);
+			path = Measurement;
 			sourceTree = "<group>";
 		};
 		C45B48ED9E54BE518A2B4A35 /* Pods */ = {
@@ -416,6 +429,7 @@
 			files = (
 				6003F59E195388D20070C39A /* FYAppDelegate.m in Sources */,
 				6003F5A7195388D20070C39A /* FYViewController.m in Sources */,
+				AE669FD91F3CA95C00622092 /* FYMeasurement.m in Sources */,
 				AE7949171F04F03500DD79EB /* FYPreviewView.m in Sources */,
 				AEFFEDA11F0E121600577107 /* FYAlertController.m in Sources */,
 				AED6E8121F0A26F100C0ED3B /* FYCameraKitPhotoCaptureDelegate.m in Sources */,

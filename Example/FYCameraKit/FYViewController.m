@@ -605,8 +605,8 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
                 self.inProgressPhotoCaptureDelegate[@(photoCaptureDelegate.requestPhotoSettings.uniqueID)] = nil;
             });
         }];
-        self.inProgressPhotoCaptureDelegate[@(photoCaptureDelegate.requestPhotoSettings.uniqueID)] = photoCaptureDelegate;
-        [self.photoOutput capturePhotoWithSettings:photoSettings delegate:photoCaptureDelegate];
+    self.inProgressPhotoCaptureDelegate[@(photoCaptureDelegate.requestPhotoSettings.uniqueID)] = photoCaptureDelegate;
+//        [self.photoOutput capturePhotoWithSettings:photoSettings delegate:photoCaptureDelegate];
     });
 }
 
@@ -991,6 +991,52 @@ typedef NS_ENUM(NSInteger, FYCameraRecordMode) {
         } completion:^(BOOL finished) {
             self.cameraUnavailableLabel.hidden = YES;
         }];
+    }
+}
+
+- (void)test {
+    AVCaptureSession *captureSession = [[AVCaptureSession alloc] init];
+    AVCaptureDevice *audioCaptureDevice = [AVCaptureDevice defaultDeviceWithMediaType:AVMediaTypeAudio];
+    NSError *error = nil;
+    AVCaptureDeviceInput *audioInput = [AVCaptureDeviceInput deviceInputWithDevice:audioCaptureDevice error:&error];
+    [captureSession beginConfiguration];
+    if (audioInput) {
+        
+    }else {
+        //// Handle the failure.
+        [captureSession commitConfiguration];
+    }
+    if ([captureSession canAddInput:audioInput]) {
+        [captureSession addInput:audioInput];
+    }else {
+        // Handle the failure.
+        [captureSession commitConfiguration];
+    }
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(handleCaptureSession:) name:AVCaptureSessionInterruptionEndedNotification object:_session];
+    
+    [[NSNotificationCenter defaultCenter] removeObserver:self name:AVCaptureSessionInterruptionEndedNotification object:_session];
+}
+- (void)handleCaptureSession:(NSNotification *)notification {
+    AVCaptureSessionInterruptionReason reason = [[notification.userInfo objectForKey:AVCaptureSessionInterruptionReasonKey] unsignedIntegerValue];
+    
+    switch (reason) {
+        case AVCaptureSessionInterruptionReasonVideoDeviceNotAvailableInBackground:
+        {
+            break;
+        }
+        case AVCaptureSessionInterruptionReasonAudioDeviceInUseByAnotherClient:
+        {
+            break;
+        }
+        case AVCaptureSessionInterruptionReasonVideoDeviceInUseByAnotherClient:
+        {
+            break;
+        }
+        case AVCaptureSessionInterruptionReasonVideoDeviceNotAvailableWithMultipleForegroundApps:
+        {
+            break;
+        }
     }
 }
 
